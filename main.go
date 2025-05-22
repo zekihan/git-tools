@@ -11,11 +11,12 @@ import (
 
 var (
 	defaultThreadCount = runtime.NumCPU()
+	defaultLogLevel    = "info"
 )
 
 var (
 	verbose     = flag.Bool("v", false, "Enable verbose (DEBUG level) logging (global)")
-	logLevel    = flag.String("log-level", "info", "Set log level: debug, info, warn, error (global)")
+	logLevel    = flag.String("log-level", defaultLogLevel, "Set log level: debug, info, warn, error (global)")
 	threadCount = flag.Int("threads", defaultThreadCount, "Number of threads to use for git operations (global)")
 )
 
@@ -59,16 +60,20 @@ func main() {
 	}
 }
 
-func printPullHelp(fs *flag.FlagSet) {
-	fmt.Fprintf(os.Stderr, "Usage: git-tools pull [directory]\n\n")
-	fmt.Fprintf(os.Stderr, "Recursively pulls git repositories in a directory.\n")
-	fmt.Fprintf(os.Stderr, "If no directory is specified, it defaults to $HOME/repos.\n\n")
+func printPullHelp(_ *flag.FlagSet) {
+	fmt.Printf("Usage: git-tools pull [directory]\n\n")
+	fmt.Printf("Recursively pulls git repositories in a directory.\n")
+	fmt.Printf("If no directory is specified, it defaults to $HOME/repos.\n\n")
 }
 
 func handlePullCmd(args []string) {
 	pullCmd := flag.NewFlagSet("pull", flag.ExitOnError)
 	pullCmd.Usage = func() { printPullHelp(pullCmd) }
-	pullCmd.Parse(args)
+	err := pullCmd.Parse(args)
+	if err != nil {
+		slog.Error("Error parsing pull command", slog.Any("error", err))
+		os.Exit(1)
+	}
 
 	searchDir := "$HOME/repos"
 	if pullCmd.NArg() > 0 {
