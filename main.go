@@ -6,12 +6,17 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
+)
+
+var (
+	defaultThreadCount = runtime.NumCPU()
 )
 
 var (
 	verbose     = flag.Bool("v", false, "Enable verbose (DEBUG level) logging (global)")
 	logLevel    = flag.String("log-level", "info", "Set log level: debug, info, warn, error (global)")
-	threadCount = flag.Int("threads", 8, "Number of threads to use for git operations (global)")
+	threadCount = flag.Int("threads", defaultThreadCount, "Number of threads to use for git operations (global)")
 )
 
 func main() {
