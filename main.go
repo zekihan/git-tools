@@ -8,10 +8,13 @@ import (
 	"path/filepath"
 )
 
-func main() {
-	verbose := flag.Bool("v", false, "Enable verbose (DEBUG level) logging (global)")
-	logLevel := flag.String("log-level", "info", "Set log level: debug, info, warn, error (global)")
+var (
+	verbose     = flag.Bool("v", false, "Enable verbose (DEBUG level) logging (global)")
+	logLevel    = flag.String("log-level", "info", "Set log level: debug, info, warn, error (global)")
+	threadCount = flag.Int("threads", 8, "Number of threads to use for git operations (global)")
+)
 
+func main() {
 	flag.Usage = printGlobalHelp // Set global usage
 	flag.Parse()
 
@@ -76,7 +79,7 @@ func handlePullCmd(args []string) {
 
 	slog.Info("Starting git pull script", slog.String("dir", absSearchDir))
 
-	if err := run(absSearchDir); err != nil {
+	if err := run(absSearchDir, *threadCount); err != nil {
 		slog.Error("Error running git pull", slog.Any("error", err))
 		os.Exit(1)
 	}

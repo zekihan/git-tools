@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 // isGitDir checks if a directory is a Git repository.
@@ -119,22 +120,37 @@ func findGitRepos(searchDir string) ([]string, error) {
 	return repos, nil
 }
 
-func run(absSearchDir string) error {
+func run(absSearchDir string, threadCount int) error {
 	repos, err := findGitRepos(absSearchDir)
 	if err != nil {
 		return fmt.Errorf("error walking directory %s: %v", absSearchDir, err)
 	}
 
+	var wg sync.WaitGroup
+
+	semaphore := make(chan struct{}, threadCount) // Limit to threadCount concurrent operations
+	defer close(semaphore)
+
+	wg.Add(len(repos))
 	for _, repo := range repos {
-		ok, err := pull(repo)
-		if !ok && err != nil {
-			return fmt.Errorf("error pulling in %s: %v", repo, err)
-		} else if ok && err != nil {
-			slog.Warn("Warning while pulling in repo", slog.String("repo", repo), slog.Any("error", err))
-		} else {
-			slog.Info("Pulled in repo", slog.String("repo", repo))
-		}
+		semaphore <- struct{}{} // Acquire a slot
+
+		go func(r string) {
+			defer wg.Done()
+			defer func() { <-semaphore }() // Release the slot
+
+			ok, err := pull(r)
+			if !ok && err != nil {
+				slog.Error("Error pulling in repo", slog.String("repo", r), slog.Any("error", err))
+			} else if ok && err != nil {
+				slog.Warn("Warning while pulling in repo", slog.String("repo", r), slog.Any("error", err))
+			} else {
+				slog.Info("Pulled in repo", slog.String("repo", r))
+			}
+		}(repo)
 	}
+
+	wg.Wait() // Wait for all goroutines to finish
 
 	return nil
 }
