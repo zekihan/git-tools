@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -108,4 +109,30 @@ func getRepoPath(repoURL string, name string) (string, error) {
 	destination = strings.TrimSuffix(destination, ".git") // Ensures .git is not part of the final directory name
 
 	return destination, nil
+}
+
+func cloneRepo(repoURL string, name string) (string, error) {
+	repoPath, err := getRepoPath(repoURL, name)
+	if err != nil {
+		return "", fmt.Errorf("error getting repository path: %w", err)
+	}
+
+	if _, err := os.Stat(repoPath + "/.git"); !os.IsNotExist(err) {
+		return repoPath, fmt.Errorf("repository already exists: %s", repoPath)
+	}
+
+	if _, err := os.Stat(repoPath); !os.IsNotExist(err) {
+		return repoPath, fmt.Errorf("directory already exists: %s. Please remove it before cloning again", repoPath)
+	}
+
+	if err := os.MkdirAll(repoPath, 0755); err != nil {
+		return "", fmt.Errorf("error creating directory %s: %w", repoPath, err)
+	}
+
+	cmd := exec.Command("git", "clone", repoURL, repoPath)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return "", fmt.Errorf("error cloning repository: %s\nOutput: %s", err, output)
+	}
+
+	return repoPath, nil
 }
