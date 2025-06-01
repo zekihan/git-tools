@@ -3,34 +3,11 @@ package main
 import (
 	"fmt"
 	"log/slog"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
 	"sync"
 )
 
-// isGitDir checks if a directory is a Git repository.
-func isGitDir(dir string) bool {
-	gitPath := filepath.Join(dir, ".git")
-	info, err := os.Stat(gitPath)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return info.IsDir()
-}
-
-// runCommand executes a command in a given directory and returns its output.
-// It suppresses stdout and stderr of the command.
-func runCommand(dir string, name string, arg ...string) (string, error) {
-	cmd := exec.Command(name, arg...)
-	cmd.Dir = dir
-	output, err := cmd.CombinedOutput()
-	return strings.TrimSpace(string(output)), err
-}
-
-// pull performs git operations in the specified directory.
-func pull(dir string) (bool, error) {
+// pullRepo performs git operations in the specified directory.
+func pullRepo(dir string) (bool, error) {
 	// Check if there is a remote
 	remoteOutput, err := runCommand(dir, "git", "remote", "-v")
 	if err != nil {
@@ -85,42 +62,7 @@ func pull(dir string) (bool, error) {
 	return true, nil
 }
 
-// findGitRepos recursively walks through directories and updates Git repos.
-func findGitRepos(searchDir string) ([]string, error) {
-	entries, err := os.ReadDir(searchDir)
-	if err != nil {
-		return nil, fmt.Errorf("error reading directory %s: %v", searchDir, err)
-	}
-
-	repos := make([]string, 0)
-
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		if entry.Name() == ".git" {
-			repos = append(repos, searchDir)
-			continue
-		}
-
-		fullPath := filepath.Join(searchDir, entry.Name())
-		if isGitDir(fullPath) {
-			repos = append(repos, fullPath)
-			continue
-		}
-
-		subRepos, err := findGitRepos(fullPath)
-		if err != nil {
-			return nil, err
-		}
-		repos = append(repos, subRepos...)
-	}
-
-	return repos, nil
-}
-
-func run(absSearchDir string, threadCount int) error {
+func pullAll(absSearchDir string, threadCount int) error {
 	repos, err := findGitRepos(absSearchDir)
 	if err != nil {
 		return fmt.Errorf("error walking directory %s: %v", absSearchDir, err)
@@ -139,7 +81,7 @@ func run(absSearchDir string, threadCount int) error {
 			defer wg.Done()
 			defer func() { <-semaphore }() // Release the slot
 
-			ok, err := pull(r)
+			ok, err := pullRepo(r)
 			if !ok && err != nil {
 				slog.Error("Error pulling in repo", slog.String("repo", r), slog.Any("error", err))
 			} else if ok && err != nil {

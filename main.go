@@ -89,7 +89,7 @@ func handlePullCmd(args []string) {
 
 	slog.Info("Starting git pull script", slog.String("dir", absSearchDir))
 
-	if err := run(absSearchDir, *threadCount); err != nil {
+	if err := pullAll(absSearchDir, *threadCount); err != nil {
 		slog.Error("Error running git pull", slog.Any("error", err))
 		os.Exit(1)
 	}
