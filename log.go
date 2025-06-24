@@ -8,19 +8,19 @@ import (
 )
 
 func initLogger(s string) {
-	logLevel := slog.LevelInfo
+	level := slog.LevelInfo
 
 	switch s {
 	case "debug":
-		logLevel = slog.LevelDebug
+		level = slog.LevelDebug
 	case "info":
-		logLevel = slog.LevelInfo
+		level = slog.LevelInfo
 	case "warn":
-		logLevel = slog.LevelWarn
+		level = slog.LevelWarn
 	case "error":
-		logLevel = slog.LevelError
+		level = slog.LevelError
 	case "":
-		logLevel = slog.LevelInfo
+		level = slog.LevelInfo
 	default:
 		slog.Warn("Invalid log level, using info", slog.String("level", s))
 	}
@@ -28,8 +28,8 @@ func initLogger(s string) {
 	// Initialize the logger
 	logger := slog.New(
 		tint.NewHandler(os.Stdout, &tint.Options{
-			Level:      logLevel,
-			TimeFormat: time.Kitchen,
+			Level:      level,
+			TimeFormat: time.RFC3339,
 		}),
 	)
 	slog.SetDefault(logger)
