@@ -1,8 +1,10 @@
 package main
 
 import (
+	"github.com/lmittmann/tint"
 	"log/slog"
 	"os"
+	"time"
 )
 
 func initLogger(s string) {
@@ -24,8 +26,11 @@ func initLogger(s string) {
 	}
 
 	// Initialize the logger
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: logLevel,
-	}))
+	logger := slog.New(
+		tint.NewHandler(os.Stdout, &tint.Options{
+			Level:      logLevel,
+			TimeFormat: time.Kitchen,
+		}),
+	)
 	slog.SetDefault(logger)
 }
