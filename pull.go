@@ -36,7 +36,7 @@ func pullRepo(dir string) (bool, error) {
 	}
 
 	// Skip if there are local changes
-	statusOutput, err := runCommand(dir, "git", "status", "--porcelain")
+	statusOutput, err := runCommand(dir, "git", "status", "--porcelain", "--untracked-files=no")
 	if err != nil {
 		slog.Debug("Error checking status", slog.String("dir", dir), slog.Any("error", err), slog.String("output", statusOutput))
 		return false, fmt.Errorf("error checking status: %w", err)
