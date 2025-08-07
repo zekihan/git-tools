@@ -16,11 +16,12 @@ func Test_getRepoPath(t *testing.T) {
 		repoURL string
 		name    string
 	}
+
 	tests := []struct {
-		name string
-		args args
-		want string
 		err  error
+		args args
+		name string
+		want string
 	}{
 		// HTTPS URLS
 		{
@@ -29,8 +30,7 @@ func Test_getRepoPath(t *testing.T) {
 				repoURL: "https://git.com/user/repo.git",
 				name:    "",
 			},
-			want: fmt.Sprintf("%s/repos/git.com/user/repo", homeDir),
-			err:  nil,
+			want: homeDir + "/repos/git.com/user/repo",
 		},
 		{
 			name: "https with user no .git",
@@ -38,8 +38,7 @@ func Test_getRepoPath(t *testing.T) {
 				repoURL: "https://git.com/user/repo",
 				name:    "",
 			},
-			want: fmt.Sprintf("%s/repos/git.com/user/repo", homeDir),
-			err:  nil,
+			want: homeDir + "/repos/git.com/user/repo",
 		},
 		{
 			name: "https simple with .git",
@@ -47,8 +46,7 @@ func Test_getRepoPath(t *testing.T) {
 				repoURL: "https://git.com/repo.git",
 				name:    "",
 			},
-			want: fmt.Sprintf("%s/repos/git.com/repo", homeDir),
-			err:  nil,
+			want: homeDir + "/repos/git.com/repo",
 		},
 		{
 			name: "https simple no .git",
@@ -56,8 +54,7 @@ func Test_getRepoPath(t *testing.T) {
 				repoURL: "https://git.com/repo",
 				name:    "",
 			},
-			want: fmt.Sprintf("%s/repos/git.com/repo", homeDir),
-			err:  nil,
+			want: homeDir + "/repos/git.com/repo",
 		},
 		{
 			name: "https simple with .git and custom name",
@@ -65,8 +62,7 @@ func Test_getRepoPath(t *testing.T) {
 				repoURL: "https://git.com/repo.git",
 				name:    "repo_name",
 			},
-			want: fmt.Sprintf("%s/repos/git.com/repo_name", homeDir),
-			err:  nil,
+			want: homeDir + "/repos/git.com/repo_name",
 		},
 		{
 			name: "https simple no .git and custom name",
@@ -74,8 +70,7 @@ func Test_getRepoPath(t *testing.T) {
 				repoURL: "https://git.com/repo",
 				name:    "repo_name",
 			},
-			want: fmt.Sprintf("%s/repos/git.com/repo_name", homeDir),
-			err:  nil,
+			want: homeDir + "/repos/git.com/repo_name",
 		},
 		{
 			name: "https with user, .git and port",
@@ -83,8 +78,7 @@ func Test_getRepoPath(t *testing.T) {
 				repoURL: "https://git.com:8080/user/repo.git",
 				name:    "",
 			},
-			want: fmt.Sprintf("%s/repos/git.com:8080/user/repo", homeDir),
-			err:  nil,
+			want: homeDir + "/repos/git.com:8080/user/repo",
 		},
 		{
 			name: "https with user, no .git and port",
@@ -92,8 +86,7 @@ func Test_getRepoPath(t *testing.T) {
 				repoURL: "https://git.com:8080/user/repo",
 				name:    "",
 			},
-			want: fmt.Sprintf("%s/repos/git.com:8080/user/repo", homeDir),
-			err:  nil,
+			want: homeDir + "/repos/git.com:8080/user/repo",
 		},
 		// SSH URLS
 		{
@@ -102,8 +95,7 @@ func Test_getRepoPath(t *testing.T) {
 				repoURL: "git@git.com:user/repo.git",
 				name:    "",
 			},
-			want: fmt.Sprintf("%s/repos/git.com/user/repo", homeDir),
-			err:  nil,
+			want: homeDir + "/repos/git.com/user/repo",
 		},
 		{
 			name: "ssh with user no .git",
@@ -111,8 +103,7 @@ func Test_getRepoPath(t *testing.T) {
 				repoURL: "git@git.com:user/repo",
 				name:    "",
 			},
-			want: fmt.Sprintf("%s/repos/git.com/user/repo", homeDir),
-			err:  nil,
+			want: homeDir + "/repos/git.com/user/repo",
 		},
 		{
 			name: "ssh simple with .git",
@@ -120,8 +111,7 @@ func Test_getRepoPath(t *testing.T) {
 				repoURL: "ssh://git@git.com/user/repo.git",
 				name:    "",
 			},
-			want: fmt.Sprintf("%s/repos/git.com/user/repo", homeDir),
-			err:  nil,
+			want: homeDir + "/repos/git.com/user/repo",
 		},
 		{
 			name: "ssh simple with no .git",
@@ -129,8 +119,7 @@ func Test_getRepoPath(t *testing.T) {
 				repoURL: "ssh://git@git.com/user/repo",
 				name:    "",
 			},
-			want: fmt.Sprintf("%s/repos/git.com/user/repo", homeDir),
-			err:  nil,
+			want: homeDir + "/repos/git.com/user/repo",
 		},
 		{
 			name: "ssh with user, .git and port",
@@ -138,8 +127,7 @@ func Test_getRepoPath(t *testing.T) {
 				repoURL: "git@git.com:8080:user/repo.git",
 				name:    "",
 			},
-			want: fmt.Sprintf("%s/repos/git.com:8080/user/repo", homeDir),
-			err:  nil,
+			want: homeDir + "/repos/git.com:8080/user/repo",
 		},
 		{
 			name: "ssh with user, no .git and port",
@@ -147,8 +135,7 @@ func Test_getRepoPath(t *testing.T) {
 				repoURL: "git@git.com:8080:user/repo",
 				name:    "",
 			},
-			want: fmt.Sprintf("%s/repos/git.com:8080/user/repo", homeDir),
-			err:  nil,
+			want: homeDir + "/repos/git.com:8080/user/repo",
 		},
 		{
 			name: "ssh simple with .git and port",
@@ -156,8 +143,7 @@ func Test_getRepoPath(t *testing.T) {
 				repoURL: "ssh://git@git.com:8080/user/repo.git",
 				name:    "",
 			},
-			want: fmt.Sprintf("%s/repos/git.com:8080/user/repo", homeDir),
-			err:  nil,
+			want: homeDir + "/repos/git.com:8080/user/repo",
 		},
 		{
 			name: "ssh simple with no .git and port",
@@ -165,18 +151,17 @@ func Test_getRepoPath(t *testing.T) {
 				repoURL: "ssh://git@git.com:8080/user/repo",
 				name:    "",
 			},
-			want: fmt.Sprintf("%s/repos/git.com:8080/user/repo", homeDir),
-			err:  nil,
+			want: homeDir + "/repos/git.com:8080/user/repo",
 		},
 		// ERROR CASES
 		{
+			err:  fmt.Errorf("%w: %s", ErrUnsupportedGitURL, "ftp://git.com/user/repo"),
 			name: "unsupported URL format",
 			args: args{
 				repoURL: "ftp://git.com/user/repo",
 				name:    "",
 			},
 			want: "",
-			err:  fmt.Errorf("unsupported Git URL format: ftp://git.com/user/repo. Please use HTTPS or SSH"),
 		},
 	}
 	for _, tt := range tests {
@@ -185,16 +170,21 @@ func Test_getRepoPath(t *testing.T) {
 			if tt.err != nil {
 				if err == nil {
 					t.Errorf("getRepoPath() expected error %v, got nil", tt.err)
+
 					return
 				}
-				if !(err.Error() == tt.err.Error()) {
+
+				if err.Error() != tt.err.Error() {
 					t.Errorf("getRepoPath() error = %v, wantErr %v", err, tt.err)
 				}
+
 				return
 			} else if err != nil {
 				t.Errorf("getRepoPath() error = %v, want nil", err)
+
 				return
 			}
+
 			if got != tt.want {
 				t.Errorf("getRepoPath() got = %v, want %v", got, tt.want)
 			}

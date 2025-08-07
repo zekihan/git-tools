@@ -1,16 +1,17 @@
 package main
 
 import (
-	"github.com/lmittmann/tint"
 	"log/slog"
 	"os"
 	"time"
+
+	"github.com/lmittmann/tint"
 )
 
-func initLogger(s string) {
+func initLogger(logLevel string) {
 	level := slog.LevelInfo
 
-	switch s {
+	switch logLevel {
 	case "debug":
 		level = slog.LevelDebug
 	case "info":
@@ -22,10 +23,10 @@ func initLogger(s string) {
 	case "":
 		level = slog.LevelInfo
 	default:
-		slog.Warn("Invalid log level, using info", slog.String("level", s))
+		slog.Warn("Invalid log level, using info", slog.String("level", logLevel))
 	}
 
-	// Initialize the logger
+	// Initialize the logger.
 	logger := slog.New(
 		tint.NewHandler(os.Stdout, &tint.Options{
 			Level:      level,

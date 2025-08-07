@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -8,13 +10,17 @@ import (
 	"path/filepath"
 )
 
-func handlePullCmd(args []string) {
+var errRepoURLRequired = errors.New("repository URL is required")
+
+func handlePullCmd(ctx context.Context, args []string) error {
 	pullCmd := flag.NewFlagSet("pull", flag.ExitOnError)
 	pullCmd.Usage = func() { printPullHelp(pullCmd) }
+
 	err := pullCmd.Parse(args)
 	if err != nil {
-		slog.Error("Error parsing pull command", slog.Any("error", err))
-		os.Exit(1)
+		slog.ErrorContext(ctx, "Error parsing pull command", slog.Any("error", err))
+
+		return fmt.Errorf("error parsing pull command: %w", err)
 	}
 
 	searchDir := "$HOME/repos"
@@ -23,83 +29,135 @@ func handlePullCmd(args []string) {
 	}
 
 	searchDir = os.ExpandEnv(searchDir)
+
 	absSearchDir, err := filepath.Abs(searchDir)
 	if err != nil {
-		slog.Error("Error getting absolute path", slog.String("dir", searchDir), slog.Any("error", err))
-		os.Exit(1)
+		slog.ErrorContext(
+			ctx,
+			"Error getting absolute path",
+			slog.String("dir", searchDir),
+			slog.Any("error", err),
+		)
+
+		return fmt.Errorf("error getting absolute path for %s: %w", searchDir, err)
 	}
 
-	slog.Info("Starting git pull script", slog.String("dir", absSearchDir))
+	slog.InfoContext(ctx, "Starting git pull script", slog.String("dir", absSearchDir))
 
-	if err := pullAll(absSearchDir, *threadCount); err != nil {
-		slog.Error("Error running git pull", slog.Any("error", err))
-		os.Exit(1)
+	err = pullAll(ctx, absSearchDir, *threadCount)
+	if err != nil {
+		slog.ErrorContext(ctx, "Error running git pull", slog.Any("error", err))
+
+		return err
 	}
 
-	slog.Info("Git pull script completed", slog.String("dir", absSearchDir))
+	slog.InfoContext(ctx, "Git pull script completed", slog.String("dir", absSearchDir))
+
+	return nil
 }
 
-func handleCloneCmd(args []string) {
+func handleCloneCmd(ctx context.Context, args []string) error {
 	cloneCmd := flag.NewFlagSet("clone", flag.ExitOnError)
 	cloneCmd.Usage = func() { printCloneHelp(cloneCmd) }
+
 	err := cloneCmd.Parse(args)
 	if err != nil {
-		slog.Error("Error parsing clone command", slog.Any("error", err))
-		os.Exit(1)
+		slog.ErrorContext(ctx, "Error parsing clone command", slog.Any("error", err))
+
+		return fmt.Errorf("error parsing clone command: %w", err)
 	}
 
 	if cloneCmd.NArg() < 1 {
-		slog.Error("Repository URL is required")
+		slog.ErrorContext(ctx, "Repository URL is required")
 		cloneCmd.Usage()
-		os.Exit(1)
+
+		return fmt.Errorf("%w", errRepoURLRequired)
 	}
 
 	repoURL := cloneCmd.Arg(0)
+
 	customName := ""
 	if cloneCmd.NArg() > 1 {
 		customName = cloneCmd.Arg(1)
 	}
 
-	slog.Info("Starting git clone", slog.String("url", repoURL), slog.String("customName", customName))
+	slog.InfoContext(
+		ctx,
+		"Starting git clone",
+		slog.String("url", repoURL),
+		slog.String("customName", customName),
+	)
 
-	clonedPath, err := cloneRepo(repoURL, customName)
+	clonedPath, err := cloneRepo(ctx, repoURL, customName)
 	if err != nil {
-		slog.Error("Error cloning repository", slog.String("url", repoURL), slog.Any("error", err))
-		os.Exit(1)
+		slog.ErrorContext(
+			ctx,
+			"Error cloning repository",
+			slog.String("url", repoURL),
+			slog.Any("error", err),
+		)
+
+		return err
 	}
 
-	slog.Info("Successfully cloned repository", slog.String("url", repoURL), slog.String("path", clonedPath))
+	slog.InfoContext(
+		ctx,
+		"Successfully cloned repository",
+		slog.String("url", repoURL),
+		slog.String("path", clonedPath),
+	)
+
+	return nil
 }
 
-func handleRepopathCmd(args []string) {
+func handleRepopathCmd(args []string) error {
 	repopathCmd := flag.NewFlagSet("repopath", flag.ExitOnError)
 	repopathCmd.Usage = func() { printRepopathHelp(repopathCmd) }
+
 	err := repopathCmd.Parse(args)
 	if err != nil {
 		slog.Error("Error parsing repopath command", slog.Any("error", err))
-		os.Exit(1)
+
+		return fmt.Errorf("error parsing repopath command: %w", err)
 	}
 
 	if repopathCmd.NArg() < 1 {
 		slog.Error("Repository URL is required")
 		repopathCmd.Usage()
-		os.Exit(1)
+
+		return fmt.Errorf("%w", errRepoURLRequired)
 	}
 
 	repoURL := repopathCmd.Arg(0)
+
 	customName := ""
 	if repopathCmd.NArg() > 1 {
 		customName = repopathCmd.Arg(1)
 	}
 
-	slog.Debug("Calculating repository path", slog.String("url", repoURL), slog.String("customName", customName))
+	slog.Debug(
+		"Calculating repository path",
+		slog.String("url", repoURL),
+		slog.String("customName", customName),
+	)
 
 	calculatedPath, err := getRepoPath(repoURL, customName)
 	if err != nil {
-		slog.Error("Error calculating repository path", slog.String("url", repoURL), slog.Any("error", err))
-		os.Exit(1)
+		slog.Error(
+			"Error calculating repository path",
+			slog.String("url", repoURL),
+			slog.Any("error", err),
+		)
+
+		return err
 	}
 
 	fmt.Println(calculatedPath) // Print the path to stdout
-	slog.Debug("Successfully calculated repository path", slog.String("url", repoURL), slog.String("path", calculatedPath))
+	slog.Debug(
+		"Successfully calculated repository path",
+		slog.String("url", repoURL),
+		slog.String("path", calculatedPath),
+	)
+
+	return nil
 }

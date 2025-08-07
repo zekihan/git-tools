@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -12,20 +14,177 @@ const (
 	defaultRemoteName = "origin"
 )
 
+var (
+	ErrNoRemoteFound        = errors.New("no remote found")
+	ErrNoRemotesFound       = errors.New("no remotes found")
+	ErrNoUpstreamBranch     = errors.New("no upstream branch found")
+	ErrNotOnDefaultBranch   = errors.New("not on default branch")
+	ErrLocalChangesDetected = errors.New("local changes detected")
+)
+
 // pullRepo performs git operations in the specified directory.
-func pullRepo(dir string) (bool, error) {
-	// Check if there is a remote
-	remoteOutput, err := runCommand(dir, "git", "remote")
+func pullRepo(ctx context.Context, dir string) (bool, error) {
+	remoteName, err := validateAndGetRemoteName(ctx, dir)
 	if err != nil {
-		slog.Debug("Error checking remotes", slog.String("dir", dir), slog.Any("error", err), slog.String("output", remoteOutput))
-		return false, fmt.Errorf("error checking remotes: %w", err)
+		slog.DebugContext(
+			ctx,
+			"Error validating remote name",
+			slog.String("dir", dir),
+			slog.Any("error", err),
+		)
+
+		return false, fmt.Errorf("error validating remote name: %w", err)
 	}
+
+	// Skip if not in main or master branch.
+	localBranchOutput, err := runCommand(ctx, dir, "git", "symbolic-ref", "--short", "HEAD")
+	if err != nil {
+		slog.DebugContext(
+			ctx,
+			"Error getting current branch",
+			slog.String("dir", dir),
+			slog.Any("error", err),
+			slog.String("output", localBranchOutput),
+		)
+
+		return false, fmt.Errorf("error getting current branch: %w", err)
+	}
+
+	setRemoteDefaultBranchOutput, err := runCommand(
+		ctx,
+		dir,
+		"git",
+		"remote",
+		"set-head",
+		remoteName,
+		"-a",
+	)
+	if err != nil {
+		slog.DebugContext(
+			ctx,
+			"Error setting remote default branch",
+			slog.String("dir", dir),
+			slog.Any("error", err),
+			slog.String("output", setRemoteDefaultBranchOutput),
+		)
+
+		return false, fmt.Errorf("error setting remote default branch: %w", err)
+	}
+
+	remoteBranchOutput, err := runCommand(
+		ctx,
+		dir,
+		"git",
+		"symbolic-ref",
+		"--short",
+		"refs/remotes/"+remoteName+"/HEAD",
+	)
+	if err != nil {
+		slog.DebugContext(
+			ctx,
+			"Error getting upstream branch",
+			slog.String("dir", dir),
+			slog.Any("error", err),
+			slog.String("output", remoteBranchOutput),
+		)
+
+		return false, fmt.Errorf("error getting upstream branch: %w", err)
+	}
+
+	remoteBranchOutput = strings.TrimPrefix(remoteBranchOutput, remoteName+"/")
+	if remoteBranchOutput == "" {
+		return false, fmt.Errorf("%w", ErrNoUpstreamBranch)
+	}
+
+	if localBranchOutput != remoteBranchOutput {
+		return true, fmt.Errorf(
+			"%w: local %s, remote %s",
+			ErrNotOnDefaultBranch,
+			localBranchOutput,
+			remoteBranchOutput,
+		)
+	}
+
+	// Skip if there are local changes.
+	statusOutput, err := runCommand(
+		ctx,
+		dir,
+		"git",
+		"status",
+		"--porcelain",
+		"--untracked-files=no",
+	)
+	if err != nil {
+		slog.DebugContext(
+			ctx,
+			"Error checking status",
+			slog.String("dir", dir),
+			slog.Any("error", err),
+			slog.String("output", statusOutput),
+		)
+
+		return false, fmt.Errorf("error checking status: %w", err)
+	}
+
+	if statusOutput != "" {
+		return true, fmt.Errorf("%w", ErrLocalChangesDetected)
+	}
+
+	slog.InfoContext(ctx, "Fetching in repo", slog.String("repo", dir))
+
+	fetchOutput, err := runCommand(ctx, dir, "git", "fetch", remoteName)
+	if err != nil {
+		slog.DebugContext(
+			ctx,
+			"Error fetching",
+			slog.String("dir", dir),
+			slog.Any("error", err),
+			slog.String("output", fetchOutput),
+		)
+
+		return false, fmt.Errorf("error fetching: %w", err)
+	}
+
+	slog.InfoContext(ctx, "Pulling in repo", slog.String("repo", dir))
+
+	pullOutput, err := runCommand(ctx, dir, "git", "pull")
+	if err != nil {
+		slog.DebugContext(
+			ctx,
+			"Error pulling",
+			slog.String("dir", dir),
+			slog.Any("error", err),
+			slog.String("output", pullOutput),
+		)
+
+		return false, fmt.Errorf("error pulling: %w", err)
+	}
+
+	return true, nil
+}
+
+func validateAndGetRemoteName(ctx context.Context, dir string) (string, error) {
+	// Check if there is a remote.
+	remoteOutput, err := runCommand(ctx, dir, "git", "remote")
+	if err != nil {
+		slog.DebugContext(
+			ctx,
+			"Error checking remotes",
+			slog.String("dir", dir),
+			slog.Any("error", err),
+			slog.String("output", remoteOutput),
+		)
+
+		return "", fmt.Errorf("error checking remotes: %w", err)
+	}
+
 	if remoteOutput == "" {
-		return true, fmt.Errorf("no remote found")
+		return "", fmt.Errorf("%w", ErrNoRemoteFound)
 	}
 
 	remotesRaw := strings.Split(remoteOutput, "\n")
 	remotes := make([]string, 0)
+
 	for _, remote := range remotesRaw {
 		remote = strings.TrimSpace(remote)
 		if remote != "" {
@@ -34,84 +193,51 @@ func pullRepo(dir string) (bool, error) {
 	}
 
 	if len(remotes) == 0 {
-		return true, fmt.Errorf("no remotes found")
+		return "", fmt.Errorf("%w", ErrNoRemotesFound)
 	}
 
-	remoteName := defaultRemoteName
+	var remoteName string
 	if slices.Contains(remotes, defaultRemoteName) {
 		remoteName = defaultRemoteName
-		slog.Debug("Default remote found", slog.String("dir", dir), slog.String("remote", remoteName), slog.Any("remotes", remotes))
+		slog.DebugContext(
+			ctx,
+			"Default remote found",
+			slog.String("dir", dir),
+			slog.String("remote", remoteName),
+			slog.Any("remotes", remotes),
+		)
 	} else {
 		remoteName = remotes[0]
-		slog.Debug("Default remote not found, using first remote", slog.String("dir", dir), slog.String("remote", remoteName), slog.Any("remotes", remotes))
+		slog.DebugContext(
+			ctx,
+			"Default remote not found, using first remote",
+			slog.String("dir", dir),
+			slog.String("remote", remoteName),
+			slog.Any("remotes", remotes),
+		)
 	}
 
-	// Check if the remote is reachable
-	remoteShowOutput, err := runCommand(dir, "git", "remote", "show", remoteName)
+	// Check if the remote is reachable.
+	remoteShowOutput, err := runCommand(ctx, dir, "git", "remote", "show", remoteName)
 	if err != nil {
-		slog.Debug("Error checking remote", slog.String("dir", dir), slog.Any("error", err), slog.String("output", remoteShowOutput))
-		return false, fmt.Errorf("error checking remote: %w", err)
+		slog.DebugContext(
+			ctx,
+			"Error checking remote",
+			slog.String("dir", dir),
+			slog.Any("error", err),
+			slog.String("output", remoteShowOutput),
+		)
+
+		return "", fmt.Errorf("error checking remote: %w", err)
 	}
 
-	// Skip if not in main or master branch
-	localBranchOutput, err := runCommand(dir, "git", "symbolic-ref", "--short", "HEAD")
-	if err != nil {
-		slog.Debug("Error getting current branch", slog.String("dir", dir), slog.Any("error", err), slog.String("output", localBranchOutput))
-		return false, fmt.Errorf("error getting current branch: %w", err)
-	}
-
-	setRemoteDefaultBranchOutput, err := runCommand(dir, "git", "remote", "set-head", remoteName, "-a")
-	if err != nil {
-		slog.Debug("Error setting remote default branch", slog.String("dir", dir), slog.Any("error", err), slog.String("output", setRemoteDefaultBranchOutput))
-		return false, fmt.Errorf("error setting remote default branch: %w", err)
-	}
-
-	remoteBranchOutput, err := runCommand(dir, "git", "symbolic-ref", "--short", "refs/remotes/"+remoteName+"/HEAD")
-	if err != nil {
-		slog.Debug("Error getting upstream branch", slog.String("dir", dir), slog.Any("error", err), slog.String("output", remoteBranchOutput))
-		return false, fmt.Errorf("error getting upstream branch: %w", err)
-	}
-
-	remoteBranchOutput = strings.TrimPrefix(remoteBranchOutput, remoteName+"/")
-	if remoteBranchOutput == "" {
-		return false, fmt.Errorf("no upstream branch found")
-	}
-
-	if localBranchOutput != remoteBranchOutput {
-		return true, fmt.Errorf("not on default branch: local %s, remote %s", localBranchOutput, remoteBranchOutput)
-	}
-
-	// Skip if there are local changes
-	statusOutput, err := runCommand(dir, "git", "status", "--porcelain", "--untracked-files=no")
-	if err != nil {
-		slog.Debug("Error checking status", slog.String("dir", dir), slog.Any("error", err), slog.String("output", statusOutput))
-		return false, fmt.Errorf("error checking status: %w", err)
-	}
-	if statusOutput != "" {
-		return true, fmt.Errorf("local changes detected")
-	}
-
-	slog.Info("Fetching in repo", slog.String("repo", dir))
-	fetchOutput, err := runCommand(dir, "git", "fetch", remoteName)
-	if err != nil {
-		slog.Debug("Error fetching", slog.String("dir", dir), slog.Any("error", err), slog.String("output", fetchOutput))
-		return false, fmt.Errorf("error fetching: %w", err)
-	}
-
-	slog.Info("Pulling in repo", slog.String("repo", dir))
-	pullOutput, err := runCommand(dir, "git", "pull")
-	if err != nil {
-		slog.Debug("Error pulling", slog.String("dir", dir), slog.Any("error", err), slog.String("output", pullOutput))
-		return false, fmt.Errorf("error pulling: %w", err)
-	}
-
-	return true, nil
+	return remoteName, nil
 }
 
-func pullAll(absSearchDir string, threadCount int) error {
+func pullAll(ctx context.Context, absSearchDir string, threadCount int) error {
 	repos, err := findGitRepos(absSearchDir)
 	if err != nil {
-		return fmt.Errorf("error walking directory %s: %v", absSearchDir, err)
+		return fmt.Errorf("error walking directory %s: %w", absSearchDir, err)
 	}
 
 	var wg sync.WaitGroup
@@ -120,20 +246,32 @@ func pullAll(absSearchDir string, threadCount int) error {
 	defer close(semaphore)
 
 	wg.Add(len(repos))
+
 	for _, repo := range repos {
 		semaphore <- struct{}{} // Acquire a slot
 
-		go func(r string) {
+		go func(repo string) {
 			defer wg.Done()
 			defer func() { <-semaphore }() // Release the slot
 
-			ok, err := pullRepo(r)
-			if !ok && err != nil {
-				slog.Error("Error pulling in repo", slog.String("repo", r), slog.Any("error", err))
-			} else if ok && err != nil {
-				slog.Warn("Warning while pulling in repo", slog.String("repo", r), slog.Any("error", err))
-			} else {
-				slog.Info("Pulled in repo", slog.String("repo", r))
+			ok, err := pullRepo(ctx, repo)
+			switch {
+			case !ok && err != nil:
+				slog.ErrorContext(
+					ctx,
+					"Error pulling in repo",
+					slog.String("repo", repo),
+					slog.Any("error", err),
+				)
+			case ok && err != nil:
+				slog.WarnContext(
+					ctx,
+					"Warning while pulling in repo",
+					slog.String("repo", repo),
+					slog.Any("error", err),
+				)
+			default:
+				slog.InfoContext(ctx, "Pulled in repo", slog.String("repo", repo))
 			}
 		}(repo)
 	}
