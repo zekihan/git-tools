@@ -29,6 +29,7 @@ var (
 
 func main() {
 	flag.Usage = printGlobalHelp // Set global usage
+
 	flag.Parse()
 
 	if *verbose {
