@@ -1,5 +1,5 @@
 module github.com/zekihan/git-tools
 
-go 1.25.5
+go 1.25.6
 
 require github.com/lmittmann/tint v1.1.2
