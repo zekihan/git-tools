@@ -55,7 +55,7 @@ func addWorktree(ctx context.Context, repoPath, repoURL, branch string) (string,
 		return "", fmt.Errorf("error creating directory %s: %w", filepath.Dir(worktreePath), err)
 	}
 
-	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "worktree", "add", worktreePath, branch)
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "worktree", "add", "-b", branch, worktreePath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("error adding worktree: %w\nOutput: %s", err, output)
