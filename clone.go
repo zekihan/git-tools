@@ -33,6 +33,11 @@ type repoURLFormat struct {
 	extract func(matches []string) (hostname, user, repo string)
 }
 
+type repoParts struct {
+	hostname string
+	userRepo string
+}
+
 // supportedFormats is a list of parsers for different Git URL schemes.
 // Each entry defines a regex to match a URL pattern and an extraction function.
 var supportedFormats = []repoURLFormat{
@@ -88,6 +93,31 @@ var supportedFormats = []repoURLFormat{
 
 // getRepoPath extracts the path from a Git repository URL and an optional name.
 func getRepoPath(repoURL, name string) (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("could not get user home directory: %w", err)
+	}
+
+	repoSubPath, err := getRepoSubPath(repoURL, name)
+	if err != nil {
+		return "", err
+	}
+
+	destination := filepath.Join(homeDir, "repos", repoSubPath)
+
+	return destination, nil
+}
+
+func getRepoSubPath(repoURL, name string) (string, error) {
+	parts, err := parseRepoParts(repoURL, name)
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(parts.hostname, parts.userRepo), nil
+}
+
+func parseRepoParts(repoURL, name string) (repoParts, error) {
 	var hostname, user, repo string
 
 	parsedSuccessfully := false
@@ -103,11 +133,11 @@ func getRepoPath(repoURL, name string) (string, error) {
 	}
 
 	if !parsedSuccessfully {
-		return "", fmt.Errorf("%w: %s", ErrUnsupportedGitURL, repoURL)
+		return repoParts{}, fmt.Errorf("%w: %s", ErrUnsupportedGitURL, repoURL)
 	}
 
 	if hostname == "" {
-		return "", fmt.Errorf("%w: %s", ErrFailedExtractHostname, repoURL)
+		return repoParts{}, fmt.Errorf("%w: %s", ErrFailedExtractHostname, repoURL)
 	}
 
 	if name != "" {
@@ -115,7 +145,7 @@ func getRepoPath(repoURL, name string) (string, error) {
 	}
 
 	if repo == "" {
-		return "", fmt.Errorf("%w: %s", ErrFailedExtractRepoName, repoURL)
+		return repoParts{}, fmt.Errorf("%w: %s", ErrFailedExtractRepoName, repoURL)
 	}
 
 	userRepo := repo
@@ -123,18 +153,9 @@ func getRepoPath(repoURL, name string) (string, error) {
 		userRepo = filepath.Join(user, repo)
 	}
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("could not get user home directory: %w", err)
-	}
+	strings.TrimSuffix(userRepo, ".git")
 
-	destination := filepath.Join(homeDir, "repos", hostname, userRepo)
-	destination = strings.TrimSuffix(
-		destination,
-		".git",
-	) // Ensures .git is not part of the final directory name
-
-	return destination, nil
+	return repoParts{hostname: hostname, userRepo: userRepo}, nil
 }
 
 func cloneRepo(ctx context.Context, repoURL, name string) (string, error) {

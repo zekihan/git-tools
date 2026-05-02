@@ -57,6 +57,16 @@ func main() {
 		if err != nil {
 			os.Exit(1)
 		}
+	case "worktree":
+		err := handleWorktreeCmd(ctx, args[1:])
+		if err != nil {
+			os.Exit(1)
+		}
+	case "worktreepath":
+		err := handleWorktreepathCmd(ctx, args[1:])
+		if err != nil {
+			os.Exit(1)
+		}
 	case "repopath":
 		err := handleRepopathCmd(args[1:])
 		if err != nil {
@@ -77,6 +87,14 @@ func main() {
 		case "clone":
 			printCloneHelp(
 				flag.NewFlagSet("clone", flag.ExitOnError),
+			) // Pass a dummy flagset for consistency
+		case "worktree":
+			printWorktreeHelp(
+				flag.NewFlagSet("worktree", flag.ExitOnError),
+			) // Pass a dummy flagset for consistency
+		case "worktreepath":
+			printWorktreepathHelp(
+				flag.NewFlagSet("worktreepath", flag.ExitOnError),
 			) // Pass a dummy flagset for consistency
 		case "repopath":
 			printRepopathHelp(
