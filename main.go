@@ -27,6 +27,7 @@ var (
 	)
 )
 
+//nolint:gocyclo // Main command dispatcher, not complex enough to warrant refactoring.
 func main() {
 	flag.Usage = printGlobalHelp // Set global usage
 

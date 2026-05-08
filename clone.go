@@ -153,7 +153,7 @@ func parseRepoParts(repoURL, name string) (repoParts, error) {
 		userRepo = filepath.Join(user, repo)
 	}
 
-	strings.TrimSuffix(userRepo, ".git")
+	userRepo = strings.TrimSuffix(userRepo, ".git")
 
 	return repoParts{hostname: hostname, userRepo: userRepo}, nil
 }

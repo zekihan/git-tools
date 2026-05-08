@@ -13,11 +13,11 @@ func Test_getWorktreePath(t *testing.T) {
 	}
 
 	tests := []struct {
+		err     error
 		name    string
 		repoURL string
 		branch  string
 		want    string
-		err     error
 	}{
 		{
 			name:    "https with user",

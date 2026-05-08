@@ -7,12 +7,12 @@ import (
 
 func Test_parseWorktreeArgs(t *testing.T) {
 	tests := []struct {
+		wantErr     error
 		name        string
 		repoURL     string
-		args        []string
 		wantRepoURL string
 		wantBranch  string
-		wantErr     error
+		args        []string
 	}{
 		{
 			name:       "branch only",
@@ -76,9 +76,9 @@ func Test_parseWorktreeArgs(t *testing.T) {
 
 func Test_toWorktreeRepoContextErr(t *testing.T) {
 	tests := []struct {
-		name string
 		in   error
 		want error
+		name string
 	}{
 		{
 			name: "maps not-inside-git-repo",

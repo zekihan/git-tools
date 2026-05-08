@@ -10,9 +10,13 @@ import (
 	"path/filepath"
 )
 
-var errRepoURLRequired = errors.New("repository URL is required")
-var errBranchRequired = errors.New("branch is required")
-var errTooManyWorktreeArgs = errors.New("too many arguments for worktree command; expected only <branch>")
+var (
+	errRepoURLRequired     = errors.New("repository URL is required")
+	errBranchRequired      = errors.New("branch is required")
+	errTooManyWorktreeArgs = errors.New(
+		"too many arguments for worktree command; expected only <branch>",
+	)
+)
 
 func handlePullCmd(ctx context.Context, args []string) error {
 	pullCmd := flag.NewFlagSet("pull", flag.ExitOnError)
@@ -114,7 +118,11 @@ func handleCloneCmd(ctx context.Context, args []string) error {
 
 func handleWorktreeCmd(ctx context.Context, args []string) error {
 	worktreeCmd := flag.NewFlagSet("worktree", flag.ExitOnError)
-	repoURLFlag := worktreeCmd.String("repo-url", "", "Repository URL to use when outside a git repository")
+	repoURLFlag := worktreeCmd.String(
+		"repo-url",
+		"",
+		"Repository URL to use when outside a git repository",
+	)
 	worktreeCmd.Usage = func() { printWorktreeHelp(worktreeCmd) }
 
 	err := worktreeCmd.Parse(args)
@@ -132,7 +140,7 @@ func handleWorktreeCmd(ctx context.Context, args []string) error {
 		return err
 	}
 
-	repoPath := ""
+	var repoPath string
 	if repoURL == "" {
 		repoPath, repoURL, err = getCurrentRepoInfo(ctx)
 		if err != nil {
@@ -178,7 +186,11 @@ func handleWorktreeCmd(ctx context.Context, args []string) error {
 
 func handleWorktreepathCmd(ctx context.Context, args []string) error {
 	worktreepathCmd := flag.NewFlagSet("worktreepath", flag.ExitOnError)
-	repoURLFlag := worktreepathCmd.String("repo-url", "", "Repository URL to use when outside a git repository")
+	repoURLFlag := worktreepathCmd.String(
+		"repo-url",
+		"",
+		"Repository URL to use when outside a git repository",
+	)
 	worktreepathCmd.Usage = func() { printWorktreepathHelp(worktreepathCmd) }
 
 	err := worktreepathCmd.Parse(args)

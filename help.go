@@ -41,6 +41,7 @@ func printCloneHelp(_ *flag.FlagSet) {
 	fmt.Printf("  [custom-name]      Optional. A custom name for the repository directory.\n")
 }
 
+//nolint:lll // just strings
 func printWorktreeHelp(_ *flag.FlagSet) {
 	fmt.Printf("Usage: git-tools worktree [--repo-url <repository-url>] <branch>\n\n")
 	fmt.Printf("Adds a git worktree using a structured destination path.\n")
@@ -49,13 +50,16 @@ func printWorktreeHelp(_ *flag.FlagSet) {
 	)
 	fmt.Printf("Behavior:\n")
 	fmt.Printf("  - Inside a git repository: infers repository from current directory.\n")
-	fmt.Printf("  - Outside a git repository: provide --repo-url to clone (if needed) before adding worktree.\n\n")
+	fmt.Printf(
+		"  - Outside a git repository: provide --repo-url to clone (if needed) before adding worktree.\n\n",
+	)
 	fmt.Printf("Options:\n")
 	fmt.Printf("  --repo-url <repository-url>  Optional. Explicit repository URL.\n\n")
 	fmt.Printf("Arguments:\n")
 	fmt.Printf("  <branch>           Branch or commit-ish to check out in the new worktree.\n")
 }
 
+//nolint:lll // just strings
 func printWorktreepathHelp(_ *flag.FlagSet) {
 	fmt.Printf("Usage: git-tools worktreepath [--repo-url <repository-url>] <branch>\n\n")
 	fmt.Printf("Calculates and prints the local path for a git worktree.\n")
