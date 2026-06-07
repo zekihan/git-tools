@@ -5,9 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync"
 )
@@ -237,18 +235,7 @@ func pruneWorktreesForRepo(ctx context.Context, repoDir string) error {
 
 	entries := parseWorktreeList(worktreeListOutput)
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("could not get user home directory: %w", err)
-	}
-
-	worktreesRoot := filepath.Join(homeDir, "worktrees") + string(filepath.Separator)
-
 	for _, entry := range entries {
-		if !strings.HasPrefix(entry.path, worktreesRoot) {
-			continue
-		}
-
 		ok, err := pruneWorktree(ctx, repoDir, remoteName, mainBranch, entry)
 
 		switch {
