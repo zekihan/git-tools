@@ -73,6 +73,11 @@ func main() {
 		if err != nil {
 			os.Exit(1)
 		}
+	case "worktreeprune":
+		err := handleWorktreepruneCmd(ctx, args[1:])
+		if err != nil {
+			os.Exit(1)
+		}
 	case "help":
 		// Allow "help <command>" for specific help.
 		if len(args) <= 1 {
@@ -100,6 +105,10 @@ func main() {
 		case "repopath":
 			printRepopathHelp(
 				flag.NewFlagSet("repopath", flag.ExitOnError),
+			) // Pass a dummy flagset for consistency
+		case "worktreeprune":
+			printWorktreepruneHelp(
+				flag.NewFlagSet("worktreeprune", flag.ExitOnError),
 			) // Pass a dummy flagset for consistency
 		default:
 			fmt.Printf("Unknown command: %s\n\n", args[1])

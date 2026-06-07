@@ -15,6 +15,7 @@ func printGlobalHelp() {
 	fmt.Println("  worktree Adds a git worktree into a structured directory.")
 	fmt.Println("  worktreepath Calculates and prints the local path for a git worktree.")
 	fmt.Println("  repopath Calculates and prints the local path for a git repository.")
+	fmt.Println("  worktreeprune Prunes stale git worktrees for all repos under a directory.")
 	fmt.Println(
 		"  help   Show this help message or help for a specific command (e.g., git-tools help pull).",
 	)
@@ -73,6 +74,23 @@ func printWorktreepathHelp(_ *flag.FlagSet) {
 	fmt.Printf("  --repo-url <repository-url>  Optional. Explicit repository URL.\n\n")
 	fmt.Printf("Arguments:\n")
 	fmt.Printf("  <branch>           Branch or commit-ish used in the calculated worktree path.\n")
+}
+
+func printWorktreepruneHelp(_ *flag.FlagSet) {
+	fmt.Printf("Usage: git-tools worktreeprune [directory]\n\n")
+	fmt.Printf("Prunes stale git worktrees for all repos under a directory.\n")
+	fmt.Printf("If no directory is specified, it defaults to $HOME/repos.\n\n")
+	fmt.Printf("For each linked worktree under $HOME/worktrees/:\n")
+	fmt.Printf(
+		"  - If merged into the remote default branch: removes the worktree and deletes the local branch.\n",
+	)
+	fmt.Printf("  - If not merged and dirty: warns and skips.\n")
+	fmt.Printf("  - If not merged and clean: attempts a rebase onto the remote default branch.\n")
+	fmt.Printf("  - If the rebase has conflicts: aborts and warns.\n\n")
+	fmt.Printf("Arguments:\n")
+	fmt.Printf(
+		"  [directory]   Optional. Directory to search for repos. Defaults to $HOME/repos.\n",
+	)
 }
 
 func printRepopathHelp(_ *flag.FlagSet) {
