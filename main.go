@@ -27,6 +27,7 @@ var (
 		defaultThreadCount,
 		"Number of threads to use for git operations (global)",
 	)
+	showVersion = flag.Bool("version", false, "Print version information and exit (global)")
 )
 
 func main() {
@@ -38,6 +39,12 @@ func run() int {
 	flag.Usage = printGlobalHelp // Set global usage
 
 	flag.Parse()
+
+	if *showVersion {
+		printVersion()
+
+		return 0
+	}
 
 	if *verbose {
 		initLogger("debug")
@@ -87,6 +94,8 @@ func run() int {
 		if err != nil {
 			return 1
 		}
+	case "version":
+		printVersion()
 	case "help":
 		// Allow "help <command>" for specific help.
 		if len(args) <= 1 {

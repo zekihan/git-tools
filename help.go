@@ -16,6 +16,7 @@ func printGlobalHelp() {
 	fmt.Println("  worktreepath   Calculates and prints the local path for a git worktree.")
 	fmt.Println("  repopath       Calculates and prints the local path for a git repository.")
 	fmt.Println("  worktreeprune  Prunes stale git worktrees for all repos under a directory.")
+	fmt.Println("  version        Print version information.")
 	fmt.Println(
 		"  help           Show this help message or help for a specific command (e.g., git-tools help pull).",
 	)
