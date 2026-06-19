@@ -168,14 +168,24 @@ func cloneRepo(ctx context.Context, repoURL, name string) (string, error) {
 		return "", fmt.Errorf("error getting repository path: %w", err)
 	}
 
-	_, err = os.Stat(filepath.Join(repoPath, ".git"))
-	if !os.IsNotExist(err) {
+	gitDir := filepath.Join(repoPath, ".git")
+
+	_, err = os.Stat(gitDir)
+	if err == nil {
 		return repoPath, fmt.Errorf("%w: %s", ErrRepoAlreadyExists, repoPath)
 	}
 
-	_, err = os.Stat(repoPath)
 	if !os.IsNotExist(err) {
+		return "", fmt.Errorf("error checking %s: %w", gitDir, err)
+	}
+
+	_, err = os.Stat(repoPath)
+	if err == nil {
 		return repoPath, fmt.Errorf("%w: %s", ErrDirAlreadyExists, repoPath)
+	}
+
+	if !os.IsNotExist(err) {
+		return "", fmt.Errorf("error checking %s: %w", repoPath, err)
 	}
 
 	err = os.MkdirAll(repoPath, defaultDirPermissions)
