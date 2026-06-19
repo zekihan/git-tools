@@ -21,7 +21,7 @@ var (
 //nolint:dupl // mirrors handleWorktreepruneCmd by design
 func handlePullCmd(ctx context.Context, args []string) error {
 	pullCmd := flag.NewFlagSet("pull", flag.ExitOnError)
-	pullCmd.Usage = func() { printPullHelp(pullCmd) }
+	pullCmd.Usage = printPullHelp
 
 	err := pullCmd.Parse(args)
 	if err != nil {
@@ -65,7 +65,7 @@ func handlePullCmd(ctx context.Context, args []string) error {
 
 func handleCloneCmd(ctx context.Context, args []string) error {
 	cloneCmd := flag.NewFlagSet("clone", flag.ExitOnError)
-	cloneCmd.Usage = func() { printCloneHelp(cloneCmd) }
+	cloneCmd.Usage = printCloneHelp
 
 	err := cloneCmd.Parse(args)
 	if err != nil {
@@ -124,7 +124,7 @@ func handleWorktreeCmd(ctx context.Context, args []string) error {
 		"",
 		"Repository URL to use when outside a git repository",
 	)
-	worktreeCmd.Usage = func() { printWorktreeHelp(worktreeCmd) }
+	worktreeCmd.Usage = printWorktreeHelp
 
 	err := worktreeCmd.Parse(args)
 	if err != nil {
@@ -192,7 +192,7 @@ func handleWorktreepathCmd(ctx context.Context, args []string) error {
 		"",
 		"Repository URL to use when outside a git repository",
 	)
-	worktreepathCmd.Usage = func() { printWorktreepathHelp(worktreepathCmd) }
+	worktreepathCmd.Usage = printWorktreepathHelp
 
 	err := worktreepathCmd.Parse(args)
 	if err != nil {
@@ -264,7 +264,7 @@ func parseWorktreeArgs(repoURL string, args []string) (string, string, error) {
 //nolint:dupl // mirrors handlePullCmd by design
 func handleWorktreepruneCmd(ctx context.Context, args []string) error {
 	worktreepruneCmd := flag.NewFlagSet("worktreeprune", flag.ExitOnError)
-	worktreepruneCmd.Usage = func() { printWorktreepruneHelp(worktreepruneCmd) }
+	worktreepruneCmd.Usage = printWorktreepruneHelp
 
 	err := worktreepruneCmd.Parse(args)
 	if err != nil {
@@ -308,7 +308,7 @@ func handleWorktreepruneCmd(ctx context.Context, args []string) error {
 
 func handleRepopathCmd(args []string) error {
 	repopathCmd := flag.NewFlagSet("repopath", flag.ExitOnError)
-	repopathCmd.Usage = func() { printRepopathHelp(repopathCmd) }
+	repopathCmd.Usage = printRepopathHelp
 
 	err := repopathCmd.Parse(args)
 	if err != nil {

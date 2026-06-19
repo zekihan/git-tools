@@ -22,13 +22,13 @@ func printGlobalHelp() {
 	fmt.Println("\nUse \"git-tools <command> --help\" for more information about a command.")
 }
 
-func printPullHelp(_ *flag.FlagSet) {
+func printPullHelp() {
 	fmt.Printf("Usage: git-tools pull [directory]\n\n")
 	fmt.Printf("Recursively pulls git repositories in a directory.\n")
 	fmt.Printf("If no directory is specified, it defaults to $HOME/repos.\n\n")
 }
 
-func printCloneHelp(_ *flag.FlagSet) {
+func printCloneHelp() {
 	fmt.Printf("Usage: git-tools clone <repository-url> [custom-name]\n\n")
 	fmt.Printf("Clones a git repository into a structured directory based on the URL.\n")
 	fmt.Printf(
@@ -43,7 +43,7 @@ func printCloneHelp(_ *flag.FlagSet) {
 }
 
 //nolint:lll // just strings
-func printWorktreeHelp(_ *flag.FlagSet) {
+func printWorktreeHelp() {
 	fmt.Printf("Usage: git-tools worktree [--repo-url <repository-url>] <branch>\n\n")
 	fmt.Printf("Adds a git worktree using a structured destination path.\n")
 	fmt.Printf(
@@ -61,7 +61,7 @@ func printWorktreeHelp(_ *flag.FlagSet) {
 }
 
 //nolint:lll // just strings
-func printWorktreepathHelp(_ *flag.FlagSet) {
+func printWorktreepathHelp() {
 	fmt.Printf("Usage: git-tools worktreepath [--repo-url <repository-url>] <branch>\n\n")
 	fmt.Printf("Calculates and prints the local path for a git worktree.\n")
 	fmt.Printf(
@@ -76,7 +76,7 @@ func printWorktreepathHelp(_ *flag.FlagSet) {
 	fmt.Printf("  <branch>           Branch or commit-ish used in the calculated worktree path.\n")
 }
 
-func printWorktreepruneHelp(_ *flag.FlagSet) {
+func printWorktreepruneHelp() {
 	fmt.Printf("Usage: git-tools worktreeprune [directory]\n\n")
 	fmt.Printf("Prunes stale git worktrees for all repos under a directory.\n")
 	fmt.Printf("If no directory is specified, it defaults to $HOME/repos.\n\n")
@@ -93,7 +93,7 @@ func printWorktreepruneHelp(_ *flag.FlagSet) {
 	)
 }
 
-func printRepopathHelp(_ *flag.FlagSet) {
+func printRepopathHelp() {
 	fmt.Printf("Usage: git-tools repopath <repository-url> [custom-name]\n\n")
 	fmt.Printf("Calculates and prints the local path for a git repository based on its URL.\n")
 	fmt.Printf(

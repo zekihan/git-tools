@@ -97,29 +97,17 @@ func run() int {
 
 		switch args[1] {
 		case "pull":
-			printPullHelp(
-				flag.NewFlagSet("pull", flag.ExitOnError),
-			) // Pass a dummy flagset for consistency
+			printPullHelp()
 		case "clone":
-			printCloneHelp(
-				flag.NewFlagSet("clone", flag.ExitOnError),
-			) // Pass a dummy flagset for consistency
+			printCloneHelp()
 		case "worktree":
-			printWorktreeHelp(
-				flag.NewFlagSet("worktree", flag.ExitOnError),
-			) // Pass a dummy flagset for consistency
+			printWorktreeHelp()
 		case "worktreepath":
-			printWorktreepathHelp(
-				flag.NewFlagSet("worktreepath", flag.ExitOnError),
-			) // Pass a dummy flagset for consistency
+			printWorktreepathHelp()
 		case "repopath":
-			printRepopathHelp(
-				flag.NewFlagSet("repopath", flag.ExitOnError),
-			) // Pass a dummy flagset for consistency
+			printRepopathHelp()
 		case "worktreeprune":
-			printWorktreepruneHelp(
-				flag.NewFlagSet("worktreeprune", flag.ExitOnError),
-			) // Pass a dummy flagset for consistency
+			printWorktreepruneHelp()
 		default:
 			fmt.Printf("Unknown command: %s\n\n", args[1])
 			printGlobalHelp()
