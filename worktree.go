@@ -45,7 +45,7 @@ func addWorktree(ctx context.Context, repoPath, repoURL, branch string) (string,
 		return "", err
 	}
 
-	_, err = os.Stat(repoPath + "/.git")
+	_, err = os.Stat(filepath.Join(repoPath, ".git"))
 	if os.IsNotExist(err) {
 		return "", fmt.Errorf("%w: %s", ErrRepoDoesNotExist, repoPath)
 	}
