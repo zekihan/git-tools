@@ -26,9 +26,10 @@ func initLogger(logLevel string) {
 		slog.Warn("Invalid log level, using info", slog.String("level", logLevel))
 	}
 
-	// Initialize the logger.
+	// Initialize the logger. Logs go to stderr so commands that print their
+	// result to stdout (e.g. repopath, worktreepath) stay capturable in shells.
 	logger := slog.New(
-		tint.NewHandler(os.Stdout, &tint.Options{
+		tint.NewHandler(os.Stderr, &tint.Options{
 			Level:      level,
 			TimeFormat: time.RFC3339,
 		}),
