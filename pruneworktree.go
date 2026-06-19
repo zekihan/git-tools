@@ -8,12 +8,16 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 var (
-	ErrWorktreeDetached = errors.New("worktree is in detached HEAD state")
-	ErrWorktreeDirty    = errors.New("worktree has local changes")
-	ErrRebaseConflict   = errors.New("rebase conflict detected")
+	ErrWorktreeDetached     = errors.New("worktree is in detached HEAD state")
+	ErrWorktreeDirty        = errors.New("worktree has local changes")
+	ErrRebaseConflict       = errors.New("rebase conflict detected")
+	ErrSomeReposFailedPrune = errors.New(
+		"worktree prune failed for one or more repositories",
+	)
 )
 
 type worktreeEntry struct {
@@ -267,7 +271,10 @@ func pruneAllWorktrees(ctx context.Context, absSearchDir string, threadCount int
 		return fmt.Errorf("error walking directory %s: %w", absSearchDir, err)
 	}
 
-	var wg sync.WaitGroup
+	var (
+		wg       sync.WaitGroup
+		failures atomic.Int64
+	)
 
 	semaphore := make(chan struct{}, threadCount)
 	defer close(semaphore)
@@ -283,6 +290,8 @@ func pruneAllWorktrees(ctx context.Context, absSearchDir string, threadCount int
 
 			err := pruneWorktreesForRepo(ctx, repo)
 			if err != nil {
+				failures.Add(1)
+
 				slog.ErrorContext(
 					ctx,
 					"Error pruning worktrees for repo",
@@ -294,6 +303,10 @@ func pruneAllWorktrees(ctx context.Context, absSearchDir string, threadCount int
 	}
 
 	wg.Wait()
+
+	if n := failures.Load(); n > 0 {
+		return fmt.Errorf("%w: %d failed", ErrSomeReposFailedPrune, n)
+	}
 
 	return nil
 }

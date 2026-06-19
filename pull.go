@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 const (
@@ -20,6 +21,7 @@ var (
 	ErrNoUpstreamBranch     = errors.New("no upstream branch found")
 	ErrNotOnDefaultBranch   = errors.New("not on default branch")
 	ErrLocalChangesDetected = errors.New("local changes detected")
+	ErrSomeReposFailed      = errors.New("one or more repositories failed to pull")
 )
 
 // pullRepo performs git operations in the specified directory.
@@ -225,7 +227,10 @@ func pullAll(ctx context.Context, absSearchDir string, threadCount int) error {
 		return fmt.Errorf("error walking directory %s: %w", absSearchDir, err)
 	}
 
-	var wg sync.WaitGroup
+	var (
+		wg       sync.WaitGroup
+		failures atomic.Int64
+	)
 
 	semaphore := make(chan struct{}, threadCount) // Limit to threadCount concurrent operations
 	defer close(semaphore)
@@ -242,6 +247,8 @@ func pullAll(ctx context.Context, absSearchDir string, threadCount int) error {
 			ok, err := pullRepo(ctx, repo)
 			switch {
 			case !ok && err != nil:
+				failures.Add(1)
+
 				slog.ErrorContext(
 					ctx,
 					"Error pulling in repo",
@@ -262,6 +269,10 @@ func pullAll(ctx context.Context, absSearchDir string, threadCount int) error {
 	}
 
 	wg.Wait() // Wait for all goroutines to finish
+
+	if n := failures.Load(); n > 0 {
+		return fmt.Errorf("%w: %d failed", ErrSomeReposFailed, n)
+	}
 
 	return nil
 }
