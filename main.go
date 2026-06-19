@@ -5,7 +5,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"runtime"
+	"syscall"
 )
 
 var (
@@ -27,8 +29,12 @@ var (
 	)
 )
 
-//nolint:gocyclo // Main command dispatcher, not complex enough to warrant refactoring.
 func main() {
+	os.Exit(run())
+}
+
+//nolint:gocyclo // Main command dispatcher, not complex enough to warrant refactoring.
+func run() int {
 	flag.Usage = printGlobalHelp // Set global usage
 
 	flag.Parse()
@@ -42,47 +48,51 @@ func main() {
 	args := flag.Args()
 	if len(args) < 1 {
 		printGlobalHelp()
-		os.Exit(1)
+
+		return 1
 	}
 
-	ctx := context.Background()
+	// Cancel in-flight git operations when interrupted (e.g. Ctrl-C).
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	switch args[0] {
 	case "pull":
 		err := handlePullCmd(ctx, args[1:])
 		if err != nil {
-			os.Exit(1)
+			return 1
 		}
 	case "clone":
 		err := handleCloneCmd(ctx, args[1:])
 		if err != nil {
-			os.Exit(1)
+			return 1
 		}
 	case "worktree":
 		err := handleWorktreeCmd(ctx, args[1:])
 		if err != nil {
-			os.Exit(1)
+			return 1
 		}
 	case "worktreepath":
 		err := handleWorktreepathCmd(ctx, args[1:])
 		if err != nil {
-			os.Exit(1)
+			return 1
 		}
 	case "repopath":
 		err := handleRepopathCmd(args[1:])
 		if err != nil {
-			os.Exit(1)
+			return 1
 		}
 	case "worktreeprune":
 		err := handleWorktreepruneCmd(ctx, args[1:])
 		if err != nil {
-			os.Exit(1)
+			return 1
 		}
 	case "help":
 		// Allow "help <command>" for specific help.
 		if len(args) <= 1 {
 			printGlobalHelp()
-			os.Exit(0)
+
+			return 0
 		}
 
 		switch args[1] {
@@ -117,6 +127,9 @@ func main() {
 	default:
 		fmt.Printf("Unknown command: %s\n\n", args[0])
 		printGlobalHelp()
-		os.Exit(1)
+
+		return 1
 	}
+
+	return 0
 }
