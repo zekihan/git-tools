@@ -187,6 +187,10 @@ func cloneRepo(ctx context.Context, repoURL, name string) (string, error) {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		// Remove the directory we just created so a partial/empty checkout does
+		// not block a later retry with ErrDirAlreadyExists.
+		_ = os.RemoveAll(repoPath) // best-effort cleanup; original error is returned
+
 		return "", fmt.Errorf("error cloning repository: %w\nOutput: %s", err, output)
 	}
 
