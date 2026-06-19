@@ -52,50 +52,16 @@ func pullRepo(ctx context.Context, dir string) (bool, error) {
 		return false, fmt.Errorf("error getting current branch: %w", err)
 	}
 
-	setRemoteDefaultBranchOutput, err := runCommand(
-		ctx,
-		dir,
-		"git",
-		"remote",
-		"set-head",
-		remoteName,
-		"-a",
-	)
+	remoteBranchOutput, err := getDefaultBranch(ctx, dir, remoteName)
 	if err != nil {
 		slog.DebugContext(
 			ctx,
-			"Error setting remote default branch",
+			"Error getting default branch",
 			slog.String("dir", dir),
 			slog.Any("error", err),
-			slog.String("output", setRemoteDefaultBranchOutput),
 		)
 
-		return false, fmt.Errorf("error setting remote default branch: %w", err)
-	}
-
-	remoteBranchOutput, err := runCommand(
-		ctx,
-		dir,
-		"git",
-		"symbolic-ref",
-		"--short",
-		"refs/remotes/"+remoteName+"/HEAD",
-	)
-	if err != nil {
-		slog.DebugContext(
-			ctx,
-			"Error getting upstream branch",
-			slog.String("dir", dir),
-			slog.Any("error", err),
-			slog.String("output", remoteBranchOutput),
-		)
-
-		return false, fmt.Errorf("error getting upstream branch: %w", err)
-	}
-
-	remoteBranchOutput = strings.TrimPrefix(remoteBranchOutput, remoteName+"/")
-	if remoteBranchOutput == "" {
-		return false, fmt.Errorf("%w", ErrNoUpstreamBranch)
+		return false, err
 	}
 
 	if localBranchOutput != remoteBranchOutput {
@@ -204,21 +170,52 @@ func validateAndGetRemoteName(ctx context.Context, dir string) (string, error) {
 		)
 	}
 
-	// Check if the remote is reachable.
-	remoteShowOutput, err := runCommand(ctx, dir, "git", "remote", "show", remoteName)
-	if err != nil {
-		slog.DebugContext(
-			ctx,
-			"Error checking remote",
-			slog.String("dir", dir),
-			slog.Any("error", err),
-			slog.String("output", remoteShowOutput),
-		)
+	return remoteName, nil
+}
 
-		return "", fmt.Errorf("error checking remote: %w", err)
+// getDefaultBranch resolves the remote's default branch name (e.g. "main").
+//
+// It prefers the locally recorded refs/remotes/<remote>/HEAD to avoid a network
+// round-trip, and only queries the remote via "git remote set-head -a" when that
+// symbolic ref is not yet established.
+func getDefaultBranch(ctx context.Context, dir, remoteName string) (string, error) {
+	headRef := "refs/remotes/" + remoteName + "/HEAD"
+
+	branchOutput, err := runCommand(ctx, dir, "git", "symbolic-ref", "--short", headRef)
+	if err != nil {
+		setHeadOutput, setErr := runCommand(ctx, dir, "git", "remote", "set-head", remoteName, "-a")
+		if setErr != nil {
+			slog.DebugContext(
+				ctx,
+				"Error setting remote default branch",
+				slog.String("dir", dir),
+				slog.Any("error", setErr),
+				slog.String("output", setHeadOutput),
+			)
+
+			return "", fmt.Errorf("error setting remote default branch: %w", setErr)
+		}
+
+		branchOutput, err = runCommand(ctx, dir, "git", "symbolic-ref", "--short", headRef)
+		if err != nil {
+			slog.DebugContext(
+				ctx,
+				"Error getting default branch",
+				slog.String("dir", dir),
+				slog.Any("error", err),
+				slog.String("output", branchOutput),
+			)
+
+			return "", fmt.Errorf("error getting default branch: %w", err)
+		}
 	}
 
-	return remoteName, nil
+	branch := strings.TrimPrefix(branchOutput, remoteName+"/")
+	if branch == "" {
+		return "", fmt.Errorf("%w", ErrNoUpstreamBranch)
+	}
+
+	return branch, nil
 }
 
 func pullAll(ctx context.Context, absSearchDir string, threadCount int) error {

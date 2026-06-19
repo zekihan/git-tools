@@ -54,48 +54,6 @@ func parseWorktreeList(output string) []worktreeEntry {
 	return entries
 }
 
-func getDefaultBranch(ctx context.Context, dir, remoteName string) (string, error) {
-	setHeadOutput, err := runCommand(ctx, dir, "git", "remote", "set-head", remoteName, "-a")
-	if err != nil {
-		slog.DebugContext(
-			ctx,
-			"Error setting remote default branch",
-			slog.String("dir", dir),
-			slog.Any("error", err),
-			slog.String("output", setHeadOutput),
-		)
-
-		return "", fmt.Errorf("error setting remote default branch: %w", err)
-	}
-
-	branchOutput, err := runCommand(
-		ctx,
-		dir,
-		"git",
-		"symbolic-ref",
-		"--short",
-		"refs/remotes/"+remoteName+"/HEAD",
-	)
-	if err != nil {
-		slog.DebugContext(
-			ctx,
-			"Error getting default branch",
-			slog.String("dir", dir),
-			slog.Any("error", err),
-			slog.String("output", branchOutput),
-		)
-
-		return "", fmt.Errorf("error getting default branch: %w", err)
-	}
-
-	branch := strings.TrimPrefix(branchOutput, remoteName+"/")
-	if branch == "" {
-		return "", fmt.Errorf("%w", ErrNoUpstreamBranch)
-	}
-
-	return branch, nil
-}
-
 func pruneWorktree(
 	ctx context.Context,
 	mainRepoDir, remoteName, mainBranch string,
