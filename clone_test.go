@@ -88,6 +88,30 @@ func Test_getRepoPath(t *testing.T) {
 			},
 			want: homeDir + "/repos/git.com:8080/user/repo",
 		},
+		{
+			name: "https with dotted repo name and .git",
+			args: args{
+				repoURL: "https://github.com/socketio/socket.io.git",
+				name:    "",
+			},
+			want: homeDir + "/repos/github.com/socketio/socket.io",
+		},
+		{
+			name: "https with dotted repo name no .git",
+			args: args{
+				repoURL: "https://github.com/vercel/next.js",
+				name:    "",
+			},
+			want: homeDir + "/repos/github.com/vercel/next.js",
+		},
+		{
+			name: "https repo only with dotted name",
+			args: args{
+				repoURL: "https://git.com/socket.io",
+				name:    "",
+			},
+			want: homeDir + "/repos/git.com/socket.io",
+		},
 		// SSH URLS
 		{
 			name: "ssh with user and .git",
@@ -152,6 +176,14 @@ func Test_getRepoPath(t *testing.T) {
 				name:    "",
 			},
 			want: homeDir + "/repos/git.com:8080/user/repo",
+		},
+		{
+			name: "ssh with dotted repo name",
+			args: args{
+				repoURL: "git@github.com:socketio/socket.io.git",
+				name:    "",
+			},
+			want: homeDir + "/repos/github.com/socketio/socket.io",
 		},
 		// ERROR CASES
 		{

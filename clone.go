@@ -40,10 +40,14 @@ type repoParts struct {
 
 // supportedFormats is a list of parsers for different Git URL schemes.
 // Each entry defines a regex to match a URL pattern and an extraction function.
+//
+// The repo capture group uses [^/]+ (dots allowed) so repository names such as
+// "socket.io" or "next.js" are matched. A trailing ".git" suffix is stripped in
+// parseRepoParts.
 var supportedFormats = []repoURLFormat{
 	{
 		// Regex for HTTPS URLs with user and repo: https://host.com/user/repo.git
-		regex: regexp.MustCompile(`^https://([^/]+)/([^/]+)/([^/.]+)(\.git)?$`),
+		regex: regexp.MustCompile(`^https://([^/]+)/([^/]+)/([^/]+)$`),
 		extract: func(matches []string) (string, string, string) {
 			// Matches[1]: hostname (e.g., git.com, git.com:8080)
 			// matches[2]: user
@@ -53,7 +57,7 @@ var supportedFormats = []repoURLFormat{
 	},
 	{
 		// Regex for HTTPS URLs with repo only: https://host.com/repo.git
-		regex: regexp.MustCompile(`^https://([^/]+)/([^/.]+)(\.git)?$`),
+		regex: regexp.MustCompile(`^https://([^/]+)/([^/]+)$`),
 		extract: func(matches []string) (string, string, string) {
 			// Matches[1]: hostname (e.g., git.com, git.com:8080)
 			// matches[2]: repo.
@@ -66,7 +70,7 @@ var supportedFormats = []repoURLFormat{
 		//  - git@host.com:user/repo.git
 		//  - git@host.com:repo.git
 		//  - git@host.com:port:user/repo.git.
-		regex: regexp.MustCompile(`^git@([\w.-]+(?:[:\d]+)?):(?:([^/]+)/)?([^/.]+)(\.git)?$`),
+		regex: regexp.MustCompile(`^git@([\w.-]+(?:[:\d]+)?):(?:([^/]+)/)?([^/]+)$`),
 		extract: func(matches []string) (string, string, string) {
 			// Matches[1]: hostname (e.g., host.com, host.com:port)
 			// matches[2]: user (optional, can be empty)
@@ -81,7 +85,7 @@ var supportedFormats = []repoURLFormat{
 		//  - ssh://git@host.com/user/repo.git
 		//  - ssh://git@host.com/repo.git
 		//  - ssh://git@host.com:port/user/repo.git
-		regex: regexp.MustCompile(`^ssh://git@([^/]+)/(?:([^/]+)/)?([^/.]+)(\.git)?$`),
+		regex: regexp.MustCompile(`^ssh://git@([^/]+)/(?:([^/]+)/)?([^/]+)$`),
 		extract: func(matches []string) (string, string, string) {
 			// Matches[1]: hostname (e.g., host.com, host.com:port)
 			// matches[2]: user (optional, can be empty)
