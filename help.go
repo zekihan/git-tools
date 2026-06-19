@@ -10,14 +10,14 @@ func printGlobalHelp() {
 	fmt.Println("\nGlobal options:")
 	flag.PrintDefaults() // Prints global flags
 	fmt.Println("\nAvailable commands:")
-	fmt.Println("  pull   Recursively pulls git repositories in a directory.")
-	fmt.Println("  clone  Clones a git repository into a structured directory.")
-	fmt.Println("  worktree Adds a git worktree into a structured directory.")
-	fmt.Println("  worktreepath Calculates and prints the local path for a git worktree.")
-	fmt.Println("  repopath Calculates and prints the local path for a git repository.")
-	fmt.Println("  worktreeprune Prunes stale git worktrees for all repos under a directory.")
+	fmt.Println("  pull           Recursively pulls git repositories in a directory.")
+	fmt.Println("  clone          Clones a git repository into a structured directory.")
+	fmt.Println("  worktree       Adds a git worktree into a structured directory.")
+	fmt.Println("  worktreepath   Calculates and prints the local path for a git worktree.")
+	fmt.Println("  repopath       Calculates and prints the local path for a git repository.")
+	fmt.Println("  worktreeprune  Prunes stale git worktrees for all repos under a directory.")
 	fmt.Println(
-		"  help   Show this help message or help for a specific command (e.g., git-tools help pull).",
+		"  help           Show this help message or help for a specific command (e.g., git-tools help pull).",
 	)
 	fmt.Println("\nUse \"git-tools <command> --help\" for more information about a command.")
 }
