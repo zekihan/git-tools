@@ -130,21 +130,6 @@ func pullRepo(ctx context.Context, dir string) (bool, error) {
 		return true, fmt.Errorf("%w", ErrLocalChangesDetected)
 	}
 
-	slog.InfoContext(ctx, "Fetching in repo", slog.String("repo", dir))
-
-	fetchOutput, err := runCommand(ctx, dir, "git", "fetch", remoteName)
-	if err != nil {
-		slog.DebugContext(
-			ctx,
-			"Error fetching",
-			slog.String("dir", dir),
-			slog.Any("error", err),
-			slog.String("output", fetchOutput),
-		)
-
-		return false, fmt.Errorf("error fetching: %w", err)
-	}
-
 	slog.InfoContext(ctx, "Pulling in repo", slog.String("repo", dir))
 
 	pullOutput, err := runCommand(ctx, dir, "git", "pull")
