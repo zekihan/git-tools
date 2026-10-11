@@ -26,3 +26,8 @@
 *.ipr
 *.iws
 .idea/**/.gitignore
+
+# Build and release artifacts
+/dist/
+/tmp/
+/git-tools

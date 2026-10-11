@@ -40,3 +40,14 @@ test/cover: tidy
 	mkdir -p ${TMP_DIR}
 	./scripts/go_test.sh -v -buildvcs -vet=all -coverprofile=${TMP_DIR}/coverage.out ./...
 	${GO_EXECUTABLE} tool cover -html=${TMP_DIR}/coverage.out
+
+## build: compile the CLI
+.PHONY: build
+build:
+	${GO_EXECUTABLE} build -trimpath -o ${TMP_DIR}/${BINARY_NAME} .
+
+## release/check: validate and build release artifacts without publishing
+.PHONY: release/check
+release/check:
+	goreleaser check
+	goreleaser release --snapshot --clean --skip=publish
