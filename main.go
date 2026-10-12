@@ -94,6 +94,11 @@ func run() int {
 		if err != nil {
 			return 1
 		}
+	case "cleanup":
+		err := handleCleanupCmd(ctx, args[1:])
+		if err != nil {
+			return 1
+		}
 	case "version":
 		printVersion()
 	case "help":
@@ -105,6 +110,8 @@ func run() int {
 		}
 
 		switch args[1] {
+		case "cleanup":
+			printCleanupHelp()
 		case "pull":
 			printPullHelp()
 		case "clone":

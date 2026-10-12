@@ -16,6 +16,9 @@ func printGlobalHelp() {
 	fmt.Println("  worktreepath   Calculates and prints the local path for a git worktree.")
 	fmt.Println("  repopath       Calculates and prints the local path for a git repository.")
 	fmt.Println("  worktreeprune  Prunes stale git worktrees for all repos under a directory.")
+	fmt.Println(
+		"  cleanup        Interactively removes worktrees and local branches with a diff preview.",
+	)
 	fmt.Println("  version        Print version information.")
 	fmt.Println(
 		"  help           Show this help message or help for a specific command (e.g., git-tools help pull).",
@@ -108,4 +111,27 @@ func printRepopathHelp() {
 	fmt.Printf(
 		"  [custom-name]      Optional. A custom name for the repository directory part of the path.\n",
 	)
+}
+
+func printCleanupHelp() {
+	fmt.Println("Usage: git-tools cleanup [directory]")
+	fmt.Println(
+		"\nBrowse worktrees and local branches in the current repository, or recursively under a directory.",
+	)
+	fmt.Println(
+		"Preview committed changes from the merge base with cached origin/HEAD, plus local worktree changes.",
+	)
+	fmt.Println(
+		"No automatic fetch. Configure origin/HEAD with git remote set-head origin -a if missing.",
+	)
+	fmt.Println("\nj/k or arrows: select; PgUp/PgDown: scroll preview; r: refresh; q: quit.")
+	fmt.Println("d: remove a worktree (keep its branch), or delete a branch without a worktree.")
+	fmt.Println("b: remove a worktree and delete its branch. Every action asks for confirmation.")
+	fmt.Println(
+		"Dirty, locked, default, or unmerged items require typing delete at a second confirmation.",
+	)
+	fmt.Println(
+		"Git does not support removing the main worktree.",
+	)
+	fmt.Println("Only local branches are deleted; remote branches are untouched.")
 }
