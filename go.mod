@@ -3,7 +3,7 @@ module github.com/zekihan/git-tools
 go 1.27.2
 
 require (
-	github.com/charmbracelet/bubbletea v1.3.10
+	github.com/charmbracelet/bubbletea/v2 v2.1.0
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/charmbracelet/x/ansi v0.10.1
 	github.com/lmittmann/tint v1.2.1
