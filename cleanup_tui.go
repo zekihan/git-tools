@@ -11,18 +11,13 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/charmbracelet/x/ansi"
-
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 const (
-	cleanupInitialWidth    = 80
-	cleanupInitialHeight   = 24
-	cleanupScrollStep      = 5
-	cleanupListRows        = 6
-	cleanupPreviewPadding  = 2
-	cleanupListHeightRatio = 4
+	cleanupInitialWidth  = 80
+	cleanupInitialHeight = 24
+	cleanupScrollStep    = 5
 )
 
 type cleanupLoaded struct {
@@ -225,96 +220,9 @@ func (model cleanupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return model, nil
 }
 
-//nolint:gocyclo,gocritic // Render the list, preview, and confirmation from an immutable model.
+//nolint:gocritic // Bubble Tea keeps immutable value model snapshots.
 func (model cleanupModel) View() string {
-	if model.width < 30 || model.height < 12 {
-		return "Resize terminal to at least 30x12. q: quit\n"
-	}
-
-	if model.confirm || model.forceConfirm {
-		prompt := "Confirm removal\n\n" + model.action() + "\n\nRemove this item? [y/N]"
-		if model.forceConfirm {
-			prompt = "Confirm permanent removal\n\n" + model.action() + "\n\n" + strings.Join(
-				model.risks,
-				"\n",
-			) + "\n\nType delete, then Enter (Esc cancels): " + model.typed
-		}
-
-		return ansi.Hardwrap(cleanupText(prompt), model.width, false) + "\n"
-	}
-
-	lines := []string{
-		"Worktree and branch cleanup",
-		"j/k: select  d: remove  b: remove + branch  r: refresh  q: quit",
-		"PgUp/PgDown: scroll diff | origin refs are cached; fetch separately",
-		"",
-	}
-
-	switch {
-	case model.loading:
-		lines = append(lines, "Loading repositories...")
-	case len(model.entries) == 0:
-		lines = append(lines, "No worktrees or local branches found.")
-	default:
-		count := min(cleanupListRows, max(1, model.height/cleanupListHeightRatio))
-		start := max(0, model.cursor-count/2)
-
-		start = min(start, max(0, len(model.entries)-count))
-		for index := start; index < min(len(model.entries), start+count); index++ {
-			entry := model.entries[index]
-
-			cursor, kind, name := " ", "branch", entry.branch
-			if index == model.cursor {
-				cursor = ">"
-			}
-
-			if entry.path != "" {
-				kind = cleanupWorktreeKind
-
-				if name == "" {
-					name = "(detached)"
-				}
-			}
-
-			row := fmt.Sprintf("%s %s | %s | %s", cursor, filepath.Base(entry.repo), kind, name)
-			if entry.blocked != "" {
-				row += " [" + entry.blocked + "]"
-			}
-
-			lines = append(lines, row)
-		}
-
-		entry := model.entries[model.cursor]
-
-		lines = append(
-			lines,
-			fmt.Sprintf("Item %d/%d | %s", model.cursor+1, len(model.entries), entry.repo),
-		)
-		if entry.path != "" {
-			lines = append(lines, entry.path)
-		}
-	}
-
-	footer := model.notice
-	if model.busy {
-		footer = "Working..."
-	}
-
-	footerLines := strings.Split(cleanupText(footer), "\n")
-
-	lines = append(lines, "", "Diff preview:")
-	preview := strings.Split(cleanupText(model.preview), "\n")
-	space := max(0, model.height-len(lines)-len(footerLines)-cleanupPreviewPadding)
-	start := min(model.offset, len(preview))
-	lines = append(lines, preview[start:min(len(preview), start+space)]...)
-	lines = append(lines, "")
-
-	lines = append(lines, footerLines...)
-	for index, line := range lines {
-		lines[index] = ansi.Truncate(cleanupText(line), model.width, "…")
-	}
-
-	return strings.Join(lines, "\n") + "\n"
+	return renderCleanup(&model)
 }
 
 //nolint:gocritic // Value models keep asynchronous command snapshots independent.
