@@ -349,3 +349,94 @@ func TestCleanupMergedIntoOriginButNotLocalHead(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestCleanupDefaultScope(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	repo := cleanupTestRepo(t)
+	nested := filepath.Join(repo, "nested")
+
+	err := os.Mkdir(nested, 0o700)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dir, err := cleanupDefaultDir(t.Context(), nested)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected := cleanupTestGit(t, repo, "rev-parse", "--show-toplevel")
+	if dir != expected {
+		t.Fatalf("inside repository: got %s, want %s", dir, expected)
+	}
+
+	outside := t.TempDir()
+
+	dir, err = cleanupDefaultDir(t.Context(), outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if dir != filepath.Join(home, "repos") {
+		t.Fatalf("outside repository: got %s", dir)
+	}
+}
+
+func TestCleanupDirectoryScanFiltersRepositories(t *testing.T) {
+	root := t.TempDir()
+	plain := cleanupTestRepo(t)
+	branched := cleanupTestRepo(t)
+
+	linked := cleanupTestRepo(t)
+	for name, source := range map[string]string{"plain": plain, "branched": branched, "linked": linked} {
+		err := os.Rename(source, filepath.Join(root, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	plain = filepath.Join(root, "plain")
+	branched = filepath.Join(root, "branched")
+	linked = filepath.Join(root, "linked")
+
+	cleanupTestGit(t, plain, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD")
+	cleanupTestGit(t, branched, "branch", "extra")
+	cleanupTestGit(
+		t,
+		linked,
+		"worktree",
+		"add",
+		"-b",
+		"feature",
+		filepath.Join(t.TempDir(), "tree"),
+	)
+
+	entries, err := loadCleanupEntries(t.Context(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(entries) != 2 {
+		t.Fatalf("want two cleanup candidates, got %v", entries)
+	}
+
+	branches := make(map[string]bool)
+
+	for _, entry := range entries {
+		if entry.blocked != "" {
+			t.Fatalf("unexpected blocked entry: %v", entry)
+		}
+
+		branches[entry.branch] = true
+	}
+
+	if !branches["extra"] || !branches["feature"] {
+		t.Fatalf("missing candidates: %v", branches)
+	}
+
+	entries, err = loadCleanupEntries(t.Context(), branched)
+	if err != nil || len(entries) != 2 {
+		t.Fatalf("single repository scope changed: %v, %v", entries, err)
+	}
+}

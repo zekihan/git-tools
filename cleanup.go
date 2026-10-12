@@ -5,7 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -29,17 +31,58 @@ func cleanupGit(ctx context.Context, dir string, args ...string) (string, error)
 	return output, nil
 }
 
-func cleanupRepos(ctx context.Context, dir string) ([]string, error) {
-	root, err := cleanupGit(ctx, dir, "rev-parse", "--show-toplevel")
+func cleanupDefaultDir(ctx context.Context, cwd string) (string, error) {
+	root, err := cleanupGit(ctx, cwd, "rev-parse", "--show-toplevel")
 	if err == nil {
-		return []string{root}, nil
+		return root, nil
 	}
 
-	return findGitRepos(dir)
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve home directory: %w", err)
+	}
+
+	return filepath.Join(home, "repos"), nil
+}
+
+func cleanupRepos(ctx context.Context, dir string) ([]string, bool, error) {
+	root, err := cleanupGit(ctx, dir, "rev-parse", "--show-toplevel")
+	if err == nil {
+		return []string{root}, true, nil
+	}
+
+	repos, err := findGitRepos(dir)
+
+	return repos, false, err
+}
+
+func cleanupRepoHasCandidates(ctx context.Context, repo string) (bool, error) {
+	output, err := cleanupGit(ctx, repo, cleanupWorktreeKind, "list", "--porcelain", "-z")
+	if err != nil {
+		return false, err
+	}
+
+	worktrees := parseCleanupWorktrees(output, repo, "")
+	if len(worktrees) > 1 {
+		return true, nil
+	}
+
+	output, err = cleanupGit(ctx, repo, "for-each-ref", "--format=%(refname:short)", "refs/heads/")
+	if err != nil {
+		return false, err
+	}
+
+	for branch := range strings.SplitSeq(output, "\n") {
+		if branch != "" && (len(worktrees) == 0 || branch != worktrees[0].branch) {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func loadCleanupEntries(ctx context.Context, dir string) ([]cleanupEntry, error) {
-	repos, err := cleanupRepos(ctx, dir)
+	repos, local, err := cleanupRepos(ctx, dir)
 	if err != nil {
 		return nil, err
 	}
@@ -47,6 +90,19 @@ func loadCleanupEntries(ctx context.Context, dir string) ([]cleanupEntry, error)
 	var entries []cleanupEntry
 
 	for _, repo := range repos {
+		if !local {
+			hasCandidates, candidateErr := cleanupRepoHasCandidates(ctx, repo)
+			if candidateErr != nil {
+				entries = append(entries, cleanupEntry{repo: repo, blocked: candidateErr.Error()})
+
+				continue
+			}
+
+			if !hasCandidates {
+				continue
+			}
+		}
+
 		found, err := cleanupEntriesForRepo(ctx, repo)
 		if err != nil {
 			entries = append(entries, cleanupEntry{repo: repo, blocked: err.Error()})
@@ -54,7 +110,13 @@ func loadCleanupEntries(ctx context.Context, dir string) ([]cleanupEntry, error)
 			continue
 		}
 
-		entries = append(entries, found...)
+		for _, entry := range found {
+			if !local && entry.blocked == "main worktree" {
+				continue
+			}
+
+			entries = append(entries, entry)
+		}
 	}
 
 	return entries, nil

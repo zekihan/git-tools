@@ -88,6 +88,13 @@ func handleCleanupCmd(ctx context.Context, args []string) error {
 		return fmt.Errorf("resolve cleanup directory: %w", err)
 	}
 
+	if flags.NArg() == 0 {
+		dir, err = cleanupDefaultDir(ctx, dir)
+		if err != nil {
+			return err
+		}
+	}
+
 	model := cleanupModel{
 		ctx:     ctx,
 		dir:     dir,

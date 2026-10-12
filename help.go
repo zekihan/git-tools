@@ -116,8 +116,10 @@ func printRepopathHelp() {
 func printCleanupHelp() {
 	fmt.Println("Usage: git-tools cleanup [directory]")
 	fmt.Println(
-		"\nBrowse worktrees and local branches in the current repository, or recursively under a directory.",
+		"\nInside a repository: browse that repository. Outside: scan $HOME/repos recursively.",
 	)
+	fmt.Println("An explicit directory overrides the default scope.")
+	fmt.Println("Directory scans show repositories with linked worktrees or extra local branches.")
 	fmt.Println(
 		"Preview committed changes from the merge base with cached origin/HEAD, plus local worktree changes.",
 	)
