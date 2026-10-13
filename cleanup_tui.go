@@ -11,7 +11,10 @@ import (
 	"strings"
 	"unicode"
 
-	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/charmbracelet/x/ansi"
+
+	tea "charm.land/bubbletea/v2"
 )
 
 const (
@@ -37,22 +40,25 @@ type cleanupRiskMsg struct {
 
 //nolint:containedctx // Bubble Tea commands need the command lifetime context.
 type cleanupModel struct {
-	ctx          context.Context
-	preview      string
-	dir          string
-	typed        string
-	notice       string
-	entries      []cleanupEntry
-	risks        []string
-	offset       int
-	height       int
-	width        int
-	cursor       int
-	loading      bool
-	busy         bool
-	confirm      bool
-	forceConfirm bool
-	both         bool
+	ctx             context.Context
+	preview         string
+	dir             string
+	typed           string
+	notice          string
+	entries         []cleanupEntry
+	risks           []string
+	offset          int
+	height          int
+	width           int
+	cursor          int
+	loading         bool
+	busy            bool
+	confirm         bool
+	forceConfirm    bool
+	both            bool
+	lightBackground bool
+	colorless       bool
+	noColor         bool
 }
 
 func handleCleanupCmd(ctx context.Context, args []string) error {
@@ -90,15 +96,23 @@ func handleCleanupCmd(ctx context.Context, args []string) error {
 		}
 	}
 
+	profile, noColor := cleanupColorProfile(
+		colorprofile.Detect(os.Stdout, os.Environ()),
+		os.Getenv("NO_COLOR"), os.Getenv("CLICOLOR"), os.Getenv("CLICOLOR_FORCE"),
+	)
+
 	model := cleanupModel{
-		ctx:     ctx,
-		dir:     dir,
-		width:   cleanupInitialWidth,
-		height:  cleanupInitialHeight,
-		loading: true,
+		ctx:             ctx,
+		dir:             dir,
+		width:           cleanupInitialWidth,
+		height:          cleanupInitialHeight,
+		loading:         true,
+		lightBackground: cleanupLightBackground(os.Getenv("COLORFGBG")),
+		colorless:       profile <= colorprofile.ASCII,
+		noColor:         noColor,
 	}
 
-	_, err = tea.NewProgram(model, tea.WithAltScreen(), tea.WithContext(ctx)).Run()
+	_, err = tea.NewProgram(model, tea.WithContext(ctx), tea.WithColorProfile(profile)).Run()
 	if err != nil {
 		slog.ErrorContext(ctx, "Cleanup failed", slog.Any("error", err))
 
@@ -108,12 +122,35 @@ func handleCleanupCmd(ctx context.Context, args []string) error {
 	return nil
 }
 
+// cleanupColorProfile preserves the color-environment precedence used by Lip Gloss v1.
+func cleanupColorProfile(
+	detected colorprofile.Profile,
+	noColor, cliColor, cliColorForce string,
+) (colorprofile.Profile, bool) {
+	forced := cliColorForce != "" && cliColorForce != "0"
+	if noColor != "" || (cliColor == "0" && !forced) {
+		return colorprofile.ASCII, true
+	}
+
+	if forced {
+		return max(detected, colorprofile.ANSI), false
+	}
+
+	return detected, false
+}
+
 //nolint:gocritic // Value models keep asynchronous command snapshots independent.
-func (model cleanupModel) Init() tea.Cmd { return model.load("") }
+func (model cleanupModel) Init() tea.Cmd {
+	return tea.Batch(model.load(""), tea.RequestBackgroundColor)
+}
 
 //nolint:ireturn,gocyclo,gocritic // Bubble Tea events form one state machine with immutable snapshots.
 func (model cleanupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.ColorProfileMsg:
+		model.colorless = model.noColor || msg.Profile <= colorprofile.ASCII
+	case tea.BackgroundColorMsg:
+		model.lightBackground = !msg.IsDark()
 	case tea.WindowSizeMsg:
 		model.width, model.height = msg.Width, msg.Height
 	case cleanupLoaded:
@@ -154,7 +191,9 @@ func (model cleanupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		return model.startDelete(false)
-	case tea.KeyMsg:
+	case tea.PasteMsg:
+		return model.paste(msg.Content), nil
+	case tea.KeyPressMsg:
 		key := msg.String()
 		if key == "ctrl+c" {
 			return model, tea.Quit
@@ -221,8 +260,17 @@ func (model cleanupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 //nolint:gocritic // Bubble Tea keeps immutable value model snapshots.
-func (model cleanupModel) View() string {
-	return renderCleanup(&model)
+func (model cleanupModel) View() tea.View {
+	content := renderCleanup(&model)
+	if model.colorless {
+		// Lip Gloss v1 omitted all styling, including bold, for colorless output.
+		content = ansi.Strip(content)
+	}
+
+	view := tea.NewView(content)
+	view.AltScreen = true
+
+	return view
 }
 
 //nolint:gocritic // Value models keep asynchronous command snapshots independent.
@@ -246,7 +294,7 @@ func (model cleanupModel) previewCmd() tea.Cmd {
 }
 
 //nolint:ireturn,gocritic // Bubble Tea uses immutable value model snapshots.
-func (model cleanupModel) forceKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (model cleanupModel) forceKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch key.String() {
 	case "esc":
 		model.forceConfirm = false
@@ -262,16 +310,36 @@ func (model cleanupModel) forceKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return model.startDelete(true)
 		}
 	default:
-		if key.Type == tea.KeyRunes {
-			for _, char := range key.Runes {
-				if char >= 'a' && char <= 'z' && len(model.typed) < 6 {
-					model.typed += string(char)
-				}
-			}
-		}
+		model.typed = cleanupForceText(model.typed, key.Text)
 	}
 
 	return model, nil
+}
+
+//nolint:gocritic // Value models keep input updates independent.
+func (model cleanupModel) paste(text string) cleanupModel {
+	if model.busy {
+		return model
+	}
+
+	if model.forceConfirm {
+		model.typed = cleanupForceText(model.typed, text)
+	} else {
+		model.confirm = false
+	}
+
+	return model
+}
+
+// cleanupForceText preserves the same filtering for typed and pasted confirmation text.
+func cleanupForceText(typed, text string) string {
+	for _, char := range text {
+		if char >= 'a' && char <= 'z' && len(typed) < 6 {
+			typed += string(char)
+		}
+	}
+
+	return typed
 }
 
 //nolint:ireturn,gocritic // Bubble Tea uses immutable value model snapshots.

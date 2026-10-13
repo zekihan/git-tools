@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func cleanupTestGit(t *testing.T, repo string, args ...string) string {
@@ -234,14 +234,14 @@ func TestCleanupConfirmationFlow(t *testing.T) {
 		width:   80,
 		height:  24,
 	}
-	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	updated, cmd := model.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
 
 	model = cleanupTestModel(t, updated)
 	if cmd != nil || !model.confirm {
 		t.Fatal("deletion did not require first confirmation")
 	}
 
-	updated, cmd = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	updated, cmd = model.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 
 	model = cleanupTestModel(t, updated)
 	if cmd != nil || model.confirm {
@@ -251,20 +251,20 @@ func TestCleanupConfirmationFlow(t *testing.T) {
 	updated, cmd = model.Update(cleanupRiskMsg{risks: []string{"local changes will be discarded"}})
 
 	model = cleanupTestModel(t, updated)
-	if cmd != nil || !model.forceConfirm || !strings.Contains(model.View(), "Type delete") {
+	if cmd != nil || !model.forceConfirm || !strings.Contains(model.View().Content, "Type delete") {
 		t.Fatal("second confirmation missing")
 	}
 
-	updated, cmd = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, cmd = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	model = cleanupTestModel(t, updated)
 
 	if cmd != nil {
 		t.Fatal("empty confirmation started deletion")
 	}
 
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("delete")})
+	updated, _ = model.Update(tea.PasteMsg{Content: "delete"})
 	model = cleanupTestModel(t, updated)
-	updated, cmd = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, cmd = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	model = cleanupTestModel(t, updated)
 	if cmd == nil || !model.busy {

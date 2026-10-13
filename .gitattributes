@@ -1,0 +1,2 @@
+# Terminal snapshots preserve exact padding and final blank rows.
+/testdata/cleanup/*.golden -whitespace

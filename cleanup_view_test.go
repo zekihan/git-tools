@@ -19,7 +19,7 @@ func TestCleanupSplitLayoutFitsTerminal(t *testing.T) {
 			height:  size[1],
 			preview: strings.Repeat("diff --git a/file b/file\n@@ -1 +1 @@\n-old\n+new\n", 20),
 		}
-		view := model.View()
+		view := model.View().Content
 
 		lines := strings.Split(strings.TrimSuffix(view, "\n"), "\n")
 		if len(lines) > model.height {
