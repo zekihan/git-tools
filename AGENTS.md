@@ -33,7 +33,6 @@ This is a single-package Go CLI (`package main`) that provides git workflow util
 **Commands:**
 - `pull [dir]` — recursively finds all git repos under a directory (default `$HOME/repos`) and pulls each concurrently, controlled by `--threads`
 - `clone <url> [name]` — clones a repo into a structured path under `$HOME/repos/<host>/<user>/<repo>`
-- `worktree [-repo-url <url>] <branch>` — adds a git worktree at `$HOME/worktrees/<host>/<user>/<repo>/<branch>`; auto-clones if the repo doesn't exist locally; can infer repo URL from the current working directory
 - `worktreepath [-repo-url <url>] <branch>` — prints the calculated worktree path without creating it
 - `repopath <url> [name]` — prints the calculated clone path without cloning
 

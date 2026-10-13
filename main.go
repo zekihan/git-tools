@@ -74,11 +74,6 @@ func run() int {
 		if err != nil {
 			return 1
 		}
-	case "worktree":
-		err := handleWorktreeCmd(ctx, args[1:])
-		if err != nil {
-			return 1
-		}
 	case "worktreepath":
 		err := handleWorktreepathCmd(ctx, args[1:])
 		if err != nil {
@@ -86,11 +81,6 @@ func run() int {
 		}
 	case "repopath":
 		err := handleRepopathCmd(args[1:])
-		if err != nil {
-			return 1
-		}
-	case "worktreeprune":
-		err := handleWorktreepruneCmd(ctx, args[1:])
 		if err != nil {
 			return 1
 		}
@@ -116,14 +106,10 @@ func run() int {
 			printPullHelp()
 		case "clone":
 			printCloneHelp()
-		case "worktree":
-			printWorktreeHelp()
 		case "worktreepath":
 			printWorktreepathHelp()
 		case "repopath":
 			printRepopathHelp()
-		case "worktreeprune":
-			printWorktreepruneHelp()
 		default:
 			fmt.Printf("Unknown command: %s\n\n", args[1])
 			printGlobalHelp()

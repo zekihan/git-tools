@@ -11,7 +11,6 @@ import (
 )
 
 var (
-	ErrRepoDoesNotExist        = errors.New("repository does not exist locally")
 	ErrNotInsideGitRepo        = errors.New("current directory is not inside a git repository")
 	ErrMissingOriginRemote     = errors.New("could not determine repository URL from origin remote")
 	ErrRepoURLOrGitRepoContext = errors.New(
@@ -37,79 +36,6 @@ func getWorktreePath(repoURL, branch string) (string, error) {
 	destination := filepath.Join(homeDir, "worktrees", repoSubPath, branch)
 
 	return strings.TrimSuffix(destination, ".git"), nil
-}
-
-func addWorktree(ctx context.Context, repoPath, repoURL, branch string) (string, error) {
-	worktreePath, err := getWorktreePath(repoURL, branch)
-	if err != nil {
-		return "", err
-	}
-
-	_, err = os.Stat(filepath.Join(repoPath, ".git"))
-	if os.IsNotExist(err) {
-		return "", fmt.Errorf("%w: %s", ErrRepoDoesNotExist, repoPath)
-	}
-
-	_, err = os.Stat(worktreePath)
-	if !os.IsNotExist(err) {
-		return worktreePath, fmt.Errorf("%w: %s", ErrDirAlreadyExists, worktreePath)
-	}
-
-	err = os.MkdirAll(filepath.Dir(worktreePath), defaultDirPermissions)
-	if err != nil {
-		return "", fmt.Errorf("error creating directory %s: %w", filepath.Dir(worktreePath), err)
-	}
-
-	// First try to add a worktree for an existing branch, tag, or commit-ish.
-	// If that fails (e.g. the ref does not exist yet), fall back to creating a
-	// new branch with -b.
-	output, err := runCommand(ctx, repoPath, "git", "worktree", "add", worktreePath, branch)
-	if err == nil {
-		return worktreePath, nil
-	}
-
-	createOutput, createErr := runCommand(
-		ctx,
-		repoPath,
-		"git",
-		"worktree",
-		"add",
-		"-b",
-		branch,
-		worktreePath,
-	)
-	if createErr != nil {
-		return "", fmt.Errorf(
-			"error adding worktree: %w\nOutput: %s\nfallback (-b) error: %w\nOutput: %s",
-			err,
-			output,
-			createErr,
-			createOutput,
-		)
-	}
-
-	return worktreePath, nil
-}
-
-func ensureLocalRepoForWorktree(ctx context.Context, repoURL string) (string, error) {
-	repoPath, err := getRepoPath(repoURL, "")
-	if err != nil {
-		return "", fmt.Errorf("error getting repository path: %w", err)
-	}
-
-	_, err = os.Stat(filepath.Join(repoPath, ".git"))
-	if os.IsNotExist(err) {
-		_, cloneErr := cloneRepo(ctx, repoURL, "")
-		if cloneErr != nil {
-			return "", cloneErr
-		}
-
-		return repoPath, nil
-	} else if err != nil {
-		return "", fmt.Errorf("error checking repository path %s: %w", repoPath, err)
-	}
-
-	return repoPath, nil
 }
 
 func getCurrentRepoInfo(ctx context.Context) (string, string, error) {
