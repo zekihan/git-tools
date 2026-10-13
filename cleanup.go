@@ -97,7 +97,22 @@ func loadCleanupEntries(ctx context.Context, dir string) ([]cleanupEntry, error)
 
 	var entries []cleanupEntry
 
+	seen := make(map[string]bool)
+
 	for _, repo := range repos {
+		identity, identityErr := cleanupRepoIdentity(ctx, repo)
+		if identityErr != nil {
+			entries = append(entries, cleanupEntry{repo: repo, blocked: identityErr.Error()})
+
+			continue
+		}
+
+		if seen[identity] {
+			continue
+		}
+
+		seen[identity] = true
+
 		if !local {
 			hasCandidates, candidateErr := cleanupRepoHasCandidates(ctx, repo)
 			if candidateErr != nil {
@@ -128,6 +143,26 @@ func loadCleanupEntries(ctx context.Context, dir string) ([]cleanupEntry, error)
 	}
 
 	return entries, nil
+}
+
+func cleanupRepoIdentity(ctx context.Context, repo string) (string, error) {
+	commonDir, err := cleanupGit(
+		ctx,
+		repo,
+		"rev-parse",
+		"--path-format=absolute",
+		"--git-common-dir",
+	)
+	if err != nil {
+		return "", err
+	}
+
+	identity, err := filepath.EvalSymlinks(commonDir)
+	if err != nil {
+		return "", fmt.Errorf("resolve shared Git directory: %w", err)
+	}
+
+	return identity, nil
 }
 
 func cleanupEntriesForRepo(ctx context.Context, repo string) ([]cleanupEntry, error) {

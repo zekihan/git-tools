@@ -472,3 +472,33 @@ func TestCleanupBranchTagCollision(t *testing.T) {
 		t.Fatal("tag collision bypassed default branch protection")
 	}
 }
+
+func TestCleanupDeduplicatesSharedRepositories(t *testing.T) {
+	repo := cleanupTestRepo(t)
+	linked := filepath.Join(t.TempDir(), "linked")
+	cleanupTestGit(t, repo, "worktree", "add", "-b", "feature", linked)
+	cleanupTestGit(t, repo, "branch", "extra")
+
+	entries, err := loadCleanupEntries(t.Context(), filepath.Dir(repo))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(entries) != 2 {
+		t.Fatalf("expected one worktree and one branch, got %+v", entries)
+	}
+
+	branches := make(map[string]int)
+	for _, entry := range entries {
+		branches[entry.branch]++
+	}
+
+	if branches["feature"] != 1 || branches["extra"] != 1 {
+		t.Fatalf("duplicate or missing entries: %v", branches)
+	}
+
+	local, err := loadCleanupEntries(t.Context(), linked)
+	if err != nil || len(local) != 3 {
+		t.Fatalf("linked checkout scope changed: %+v, %v", local, err)
+	}
+}
