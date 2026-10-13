@@ -38,7 +38,7 @@ func handleCloneCmd(ctx context.Context, args []string) error {
 	slog.InfoContext(
 		ctx,
 		"Starting git clone",
-		slog.String("url", repoURL),
+		slog.String("url", redactGitURL(repoURL)),
 		slog.String("customName", customName),
 	)
 
@@ -47,7 +47,7 @@ func handleCloneCmd(ctx context.Context, args []string) error {
 		slog.ErrorContext(
 			ctx,
 			"Error cloning repository",
-			slog.String("url", repoURL),
+			slog.String("url", redactGitURL(repoURL)),
 			slog.Any("error", err),
 		)
 
@@ -57,7 +57,7 @@ func handleCloneCmd(ctx context.Context, args []string) error {
 	slog.InfoContext(
 		ctx,
 		"Successfully cloned repository",
-		slog.String("url", repoURL),
+		slog.String("url", redactGitURL(repoURL)),
 		slog.String("path", clonedPath),
 	)
 
@@ -91,7 +91,7 @@ func handleRepopathCmd(args []string) error {
 
 	slog.Debug(
 		"Calculating repository path",
-		slog.String("url", repoURL),
+		slog.String("url", redactGitURL(repoURL)),
 		slog.String("customName", customName),
 	)
 
@@ -99,7 +99,7 @@ func handleRepopathCmd(args []string) error {
 	if err != nil {
 		slog.Error(
 			"Error calculating repository path",
-			slog.String("url", repoURL),
+			slog.String("url", redactGitURL(repoURL)),
 			slog.Any("error", err),
 		)
 
@@ -109,7 +109,7 @@ func handleRepopathCmd(args []string) error {
 	fmt.Println(calculatedPath) // Print the path to stdout
 	slog.Debug(
 		"Successfully calculated repository path",
-		slog.String("url", repoURL),
+		slog.String("url", redactGitURL(repoURL)),
 		slog.String("path", calculatedPath),
 	)
 

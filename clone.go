@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,7 +19,10 @@ const (
 var (
 	ErrUnsupportedGitURL = errors.New("unsupported Git URL format: Please use HTTPS or SSH")
 	ErrRepoAlreadyExists = errors.New("repository already exists")
-	ErrDirAlreadyExists  = errors.New(
+	errInvalidRepoName   = errors.New(
+		"repository name must be a single nonempty directory component",
+	)
+	ErrDirAlreadyExists = errors.New(
 		"directory already exists. Please remove it before cloning again",
 	)
 )
@@ -120,12 +124,17 @@ func getRepoSubPath(repoURL, name string) (string, error) {
 }
 
 func parseRepoParts(repoURL, name string) (repoParts, error) {
+	parseURL, err := clonePathURL(repoURL)
+	if err != nil {
+		return repoParts{}, fmt.Errorf("%w: %s", err, redactGitURL(repoURL))
+	}
+
 	var hostname, user, repo string
 
 	parsedSuccessfully := false
 
 	for _, format := range supportedFormats {
-		matches := format.regex.FindStringSubmatch(repoURL)
+		matches := format.regex.FindStringSubmatch(parseURL)
 		if len(matches) > 0 {
 			hostname, user, repo = format.extract(matches)
 			parsedSuccessfully = true
@@ -135,11 +144,17 @@ func parseRepoParts(repoURL, name string) (repoParts, error) {
 	}
 
 	if !parsedSuccessfully {
-		return repoParts{}, fmt.Errorf("%w: %s", ErrUnsupportedGitURL, repoURL)
+		return repoParts{}, fmt.Errorf("%w: %s", ErrUnsupportedGitURL, redactGitURL(repoURL))
 	}
 
 	if name != "" {
 		repo = name
+	}
+
+	repo = strings.TrimSuffix(repo, ".git")
+	if !validRepoComponent(repo) || (user != "" && !validRepoComponent(user)) ||
+		hostname == "." || hostname == ".." {
+		return repoParts{}, errInvalidRepoName
 	}
 
 	userRepo := repo
@@ -147,9 +162,12 @@ func parseRepoParts(repoURL, name string) (repoParts, error) {
 		userRepo = filepath.Join(user, repo)
 	}
 
-	userRepo = strings.TrimSuffix(userRepo, ".git")
-
 	return repoParts{hostname: hostname, userRepo: userRepo}, nil
+}
+
+func validRepoComponent(name string) bool {
+	return name != "" && name != "." && name != ".." &&
+		!strings.ContainsAny(name, "/\\\x00") && filepath.VolumeName(name) == ""
 }
 
 func cloneRepo(ctx context.Context, repoURL, name string) (string, error) {
@@ -191,8 +209,27 @@ func cloneRepo(ctx context.Context, repoURL, name string) (string, error) {
 		// not block a later retry with ErrDirAlreadyExists.
 		_ = os.RemoveAll(repoPath) // best-effort cleanup; original error is returned
 
-		return "", fmt.Errorf("error cloning repository: %w\nOutput: %s", err, output)
+		return "", fmt.Errorf(
+			"error cloning repository: %w\nOutput: %s",
+			err,
+			redactCloneOutput(string(output), repoURL),
+		)
 	}
 
 	return repoPath, nil
+}
+
+func clonePathURL(repoURL string) (string, error) {
+	if !strings.HasPrefix(repoURL, "https://") {
+		return repoURL, nil
+	}
+
+	parsed, err := url.Parse(repoURL)
+	if err != nil || parsed.Host == "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", ErrUnsupportedGitURL
+	}
+
+	parsed.User = nil
+
+	return parsed.String(), nil
 }
