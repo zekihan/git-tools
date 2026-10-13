@@ -19,10 +19,11 @@ import (
 var errTooManyCleanupArgs = errors.New("too many arguments for cleanup command")
 
 type cleanupLoaded struct {
-	err     error
-	notice  string
-	dir     string
-	entries []cleanupEntry
+	err        error
+	notice     string
+	dir        string
+	entries    []cleanupEntry
+	generation int
 }
 type cleanupPreviewMsg struct {
 	entry cleanupEntry
@@ -36,14 +37,16 @@ type cleanupRiskMsg struct {
 //nolint:containedctx // Bubble Tea commands need the command lifetime context.
 type cleanupModel struct {
 	ctx             context.Context
+	pending         cleanupEntry
 	preview         string
 	dir             string
 	typed           string
 	notice          string
-	entries         []cleanupEntry
 	risks           []string
-	offset          int
+	entries         []cleanupEntry
 	height          int
+	offset          int
+	generation      int
 	width           int
 	cursor          int
 	loading         bool
@@ -132,24 +135,7 @@ func (model cleanupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		model.width, model.height = msg.Width, msg.Height
 	case cleanupLoaded:
-		model.loading, model.busy = false, false
-
-		model.notice = msg.notice
-		if msg.dir != "" {
-			model.dir = msg.dir
-		}
-
-		if msg.err != nil {
-			model.notice = msg.err.Error()
-
-			return model, nil
-		}
-
-		model.entries = msg.entries
-		model.cursor = max(0, min(model.cursor, len(model.entries)-1))
-		model.offset, model.preview = 0, "Loading preview..."
-
-		return model, model.previewCmd()
+		return model.loaded(msg)
 	case cleanupPreviewMsg:
 		if len(model.entries) > 0 && model.entries[model.cursor] == msg.entry {
 			model.preview = msg.text
@@ -189,7 +175,7 @@ func (model cleanupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			model.confirm = false
 			if key == "y" {
 				model.busy = true
-				entry, both := model.entries[model.cursor], model.both
+				entry, both := model.pending, model.both
 
 				return model, func() tea.Msg {
 					risks, err := cleanupRisks(model.ctx, entry, both)
@@ -206,6 +192,7 @@ func (model cleanupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return model, tea.Quit
 		case "r":
 			model.loading = true
+			model.generation++
 
 			return model, model.load("")
 		case "up", "k":
@@ -229,6 +216,7 @@ func (model cleanupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			model.offset = max(0, model.offset-tuiScrollStep)
 		case "d", "b":
 			if len(model.entries) > 0 && !model.loading {
+				model.pending = model.entries[model.cursor]
 				model.both, model.confirm = key == "b", true
 			}
 		}
@@ -256,7 +244,12 @@ func (model cleanupModel) load(notice string) tea.Cmd {
 	return func() tea.Msg {
 		entries, err := loadCleanupEntries(model.ctx, model.dir)
 
-		return cleanupLoaded{entries: entries, err: err, notice: notice}
+		return cleanupLoaded{
+			entries:    entries,
+			err:        err,
+			notice:     notice,
+			generation: model.generation,
+		}
 	}
 }
 
@@ -323,7 +316,8 @@ func cleanupForceText(typed, text string) string {
 //nolint:ireturn,gocritic // Bubble Tea uses immutable value model snapshots.
 func (model cleanupModel) startDelete(force bool) (tea.Model, tea.Cmd) {
 	model.busy = true
-	entry, both := model.entries[model.cursor], model.both
+	model.generation++
+	entry, both := model.pending, model.both
 
 	return model, func() tea.Msg {
 		err := cleanupDelete(model.ctx, entry, both, force)
@@ -342,13 +336,19 @@ func (model cleanupModel) startDelete(force bool) (tea.Model, tea.Cmd) {
 
 		entries, loadErr := loadCleanupEntries(model.ctx, dir)
 
-		return cleanupLoaded{entries: entries, err: loadErr, notice: notice, dir: dir}
+		return cleanupLoaded{
+			entries:    entries,
+			err:        loadErr,
+			notice:     notice,
+			dir:        dir,
+			generation: model.generation,
+		}
 	}
 }
 
 //nolint:gocritic // Value models keep asynchronous command snapshots independent.
 func (model cleanupModel) action() string {
-	entry := model.entries[model.cursor]
+	entry := model.pending
 	if entry.path == "" {
 		return "delete branch " + entry.branch
 	}
@@ -358,4 +358,31 @@ func (model cleanupModel) action() string {
 	}
 
 	return "remove worktree " + entry.path + " (keep branch)"
+}
+
+//nolint:ireturn,gocritic // Load results update an immutable Bubble Tea model.
+func (model cleanupModel) loaded(msg cleanupLoaded) (tea.Model, tea.Cmd) {
+	if msg.generation != model.generation {
+		return model, nil
+	}
+
+	model.confirm, model.forceConfirm = false, false
+	model.loading, model.busy = false, false
+
+	model.notice = msg.notice
+	if msg.dir != "" {
+		model.dir = msg.dir
+	}
+
+	if msg.err != nil {
+		model.notice = msg.err.Error()
+
+		return model, nil
+	}
+
+	model.entries = msg.entries
+	model.cursor = max(0, min(model.cursor, len(model.entries)-1))
+	model.offset, model.preview = 0, "Loading preview..."
+
+	return model, model.previewCmd()
 }

@@ -49,9 +49,11 @@ func cleanupGoldenModels() map[string]cleanupModel {
 	empty.entries, empty.preview = nil, ""
 	models["empty"] = empty
 	confirm := base
+	confirm.pending = base.entries[0]
 	confirm.confirm, confirm.both = true, true
 	models["confirm"] = confirm
 	force := base
+	force.pending = base.entries[0]
 	force.forceConfirm, force.typed = true, "del"
 	force.risks = []string{"Unmerged commits will be lost.", "Local changes will be discarded."}
 	models["force-confirm"] = force

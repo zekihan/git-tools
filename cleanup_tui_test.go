@@ -103,7 +103,7 @@ func TestCleanupV2ConfirmationInput(t *testing.T) {
 		tea.PasteMsg{Content: "dEé\x1bele\nte extra"},
 		tea.KeyPressMsg{Text: "dEé\x1bele\nte extra"},
 	} {
-		model := cleanupModel{forceConfirm: true, entries: []cleanupEntry{{branch: "feature"}}}
+		model := cleanupModel{forceConfirm: true, pending: cleanupEntry{branch: "feature"}}
 		updated, cmd := model.Update(input)
 
 		model = cleanupTestModel(t, updated)
@@ -333,5 +333,96 @@ func TestCleanupColorEnvironmentMatchesV1(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCleanupIgnoresStaleRefreshDuringConfirmation(t *testing.T) {
+	for _, phase := range []string{"confirm", "risk", "force"} {
+		t.Run(phase, func(t *testing.T) {
+			model := cleanupModel{ctx: t.Context()}
+			updated, _ := model.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
+			model = cleanupTestModel(t, updated)
+			older := model.generation
+			updated, _ = model.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
+			model = cleanupTestModel(t, updated)
+			entry := cleanupEntry{branch: "reviewed"}
+			updated, _ = model.Update(
+				cleanupLoaded{generation: model.generation, entries: []cleanupEntry{entry}},
+			)
+			model = cleanupTestModel(t, updated)
+			updated, _ = model.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
+
+			model = cleanupTestModel(t, updated)
+			if phase != "confirm" {
+				updated, _ = model.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+				model = cleanupTestModel(t, updated)
+			}
+
+			if phase == "force" {
+				updated, _ = model.Update(cleanupRiskMsg{risks: []string{"unmerged commits"}})
+				model = cleanupTestModel(t, updated)
+			}
+
+			for _, entries := range [][]cleanupEntry{nil, {{branch: "different"}}} {
+				updated, cmd := model.Update(cleanupLoaded{generation: older, entries: entries})
+
+				actual := cleanupTestModel(t, updated)
+				if cmd != nil || len(actual.entries) != 1 || actual.pending != entry ||
+					actual.entries[0] != entry || actual.confirm != model.confirm ||
+					actual.forceConfirm != model.forceConfirm || actual.busy != model.busy {
+					t.Fatal("stale refresh changed the pending action")
+				}
+			}
+		})
+	}
+}
+
+func TestCleanupDeletionUsesConfirmedSnapshot(t *testing.T) {
+	repo := cleanupTestRepo(t)
+	cleanupTestGit(t, repo, "branch", "reviewed")
+	cleanupTestGit(t, repo, "branch", "other")
+
+	entries, err := cleanupEntriesForRepo(t.Context(), repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	model := cleanupModel{ctx: t.Context(), dir: repo, entries: entries}
+	for index, entry := range entries {
+		if entry.branch == "reviewed" {
+			model.cursor = index
+		}
+	}
+
+	updated, _ := model.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
+	model = cleanupTestModel(t, updated)
+	// Change the displayed selection after confirmation was opened.
+	for index, entry := range entries {
+		if entry.branch == "other" {
+			model.cursor = index
+		}
+	}
+
+	if model.action() != "delete branch reviewed" {
+		t.Fatal("confirmation text changed targets")
+	}
+
+	updated, cmd := model.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	model = cleanupTestModel(t, updated)
+	updated, cmd = model.Update(cmd())
+	model = cleanupTestModel(t, updated)
+	updated, _ = model.Update(cmd())
+
+	model = cleanupTestModel(t, updated)
+	if model.notice != "Removed selected item." {
+		t.Fatalf("deletion failed: %s", model.notice)
+	}
+
+	if got := cleanupTestGit(t, repo, "branch", "--list", "reviewed"); got != "" {
+		t.Fatalf("confirmed branch remains: %s", got)
+	}
+
+	if got := cleanupTestGit(t, repo, "branch", "--list", "other"); got == "" {
+		t.Fatal("unconfirmed branch was deleted")
 	}
 }
