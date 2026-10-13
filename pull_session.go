@@ -25,13 +25,15 @@ type (
 )
 type pullDoneMsg struct{}
 
+//nolint:containedctx // A session owns cancellation for its workers and subsequent retries.
 type pullSession struct {
+	ctx    context.Context
 	events chan tea.Msg
 	done   chan struct{}
 }
 
 func startPullSession(ctx context.Context, dir string, threads int) *pullSession {
-	session := &pullSession{events: make(chan tea.Msg), done: make(chan struct{})}
+	session := &pullSession{ctx: ctx, events: make(chan tea.Msg), done: make(chan struct{})}
 	go func() {
 		defer close(session.done)
 		defer close(session.events)
@@ -91,4 +93,17 @@ func (session *pullSession) next() tea.Msg {
 	}
 
 	return msg
+}
+
+func (session *pullSession) retry(path string, index int) *pullSession {
+	retry := &pullSession{ctx: session.ctx, events: make(chan tea.Msg), done: make(chan struct{})}
+	go func() {
+		defer close(retry.done)
+		defer close(retry.events)
+
+		result := pullRepo(retry.ctx, path)
+		retry.send(retry.ctx, pullFinishedMsg{index: index, result: result})
+	}()
+
+	return retry
 }

@@ -65,7 +65,7 @@ func renderPull(model *pullModel) string {
 			tuiClip(notice, model.width),
 		) + "\n" +
 		tuiClip(
-			"j/k select  PgUp/Dn scroll  "+filterHelp+"  s shell  q quit",
+			"j/k move  PgUp/Dn  "+filterHelp+"  s shell  r retry  q quit",
 			model.width,
 		) + "\n"
 }

@@ -37,6 +37,7 @@ func printPullHelp() {
 	fmt.Println(
 		"s: open your shell in the selected repository after its pull finishes; exit returns here.",
 	)
+	fmt.Println("r: retry only the selected repository once current pulls finish.")
 	fmt.Println("Results stay open until you quit. Requires an interactive terminal.")
 }
 

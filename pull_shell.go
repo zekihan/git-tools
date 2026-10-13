@@ -55,7 +55,7 @@ func (model *pullModel) openShell() tea.Cmd {
 }
 
 func (model *pullModel) shellFinished(msg pullShellFinishedMsg) {
-	model.notice = "Returned from shell."
+	model.notice = "Returned from shell. Press r to retry the selected repository."
 	if msg.err != nil {
 		model.notice = fmt.Sprintf("Shell: %v", msg.err)
 	}

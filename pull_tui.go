@@ -54,8 +54,6 @@ func handlePullCmd(ctx context.Context, args []string) error {
 	runCtx, cancel := context.WithCancel(ctx)
 	session := startPullSession(runCtx, dir, *threadCount)
 
-	defer func() { cancel(); <-session.done }()
-
 	profile, noColor := tuiColorProfile(
 		colorprofile.Detect(os.Stdout, os.Environ()),
 		os.Getenv("NO_COLOR"),
@@ -75,6 +73,8 @@ func handlePullCmd(ctx context.Context, args []string) error {
 		width:     tuiInitialWidth,
 		height:    tuiInitialHeight,
 	}
+
+	defer func() { cancel(); <-model.session.done }()
 
 	_, err = tea.NewProgram(model, tea.WithColorProfile(profile), tea.WithContext(ctx)).Run()
 	if err != nil && !model.stopping {
@@ -176,6 +176,8 @@ func (model *pullModel) key(key string) tea.Cmd {
 
 		model.stopping = true
 		model.cancel()
+	case "r":
+		return model.retrySelected()
 	case "s":
 		return model.openShell()
 	case "h":
@@ -254,4 +256,26 @@ func (model *pullModel) selectEntry(selected int) {
 
 	model.cursor = max(0, min(model.cursor, len(indices)-1))
 	model.offset = 0
+}
+
+func (model *pullModel) retrySelected() tea.Cmd {
+	selected := model.selectedIndex()
+	if selected < 0 {
+		model.notice = "Select a repository first."
+
+		return nil
+	}
+
+	if !model.done || model.stopping {
+		model.notice = "Wait for the current pulls to finish before retrying."
+
+		return nil
+	}
+
+	model.entries[selected].result = pullResult{status: pullRunning}
+	model.offset = 0
+	model.done = false
+	model.session = model.session.retry(model.entries[selected].path, selected)
+
+	return model.session.next
 }
