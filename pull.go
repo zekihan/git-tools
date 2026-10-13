@@ -104,8 +104,15 @@ func pullRepository(result *pullResult, run func(...string) (string, error)) str
 		result.remote = defaultRemoteName
 	}
 
-	result.branch, err = run("symbolic-ref", "--short", "HEAD")
+	result.branch, err = run("symbolic-ref", "--quiet", "--short", "HEAD")
 	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+			result.status = pullSkipped
+
+			return "Skipped: repository has a detached HEAD."
+		}
+
 		return err.Error()
 	}
 
@@ -150,7 +157,39 @@ func pullRepository(result *pullResult, run func(...string) (string, error)) str
 		return "Skipped: repository has local changes."
 	}
 
-	_, err = run("pull")
+	return pullDefaultBranch(result, branch, run)
+}
+
+func pullDefaultBranch(
+	result *pullResult,
+	branch string,
+	run func(...string) (string, error),
+) string {
+	upstream, err := run(
+		"for-each-ref",
+		"--format=%(upstream:remotename) %(upstream:remoteref)",
+		"refs/heads/"+result.branch,
+	)
+	if err != nil {
+		return err.Error()
+	}
+
+	if upstream == "" {
+		return ErrNoUpstreamBranch.Error()
+	}
+
+	if upstream != result.remote+" refs/heads/"+branch {
+		result.status = pullSkipped
+
+		return fmt.Sprintf(
+			"Skipped: upstream %s does not match default branch %s/%s.",
+			upstream,
+			result.remote,
+			branch,
+		)
+	}
+
+	_, err = run("pull", "--", result.remote, "refs/heads/"+branch)
 	if err != nil {
 		return err.Error()
 	}

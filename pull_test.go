@@ -93,6 +93,8 @@ func TestPullErrorsAndCanceledContext(t *testing.T) {
 	}
 
 	cleanupTestGit(t, repo, "remote", "add", "origin", filepath.Join(t.TempDir(), "missing"))
+	cleanupTestGit(t, repo, "config", "branch.main.remote", "origin")
+	cleanupTestGit(t, repo, "config", "branch.main.merge", "refs/heads/main")
 
 	result = pullRepo(t.Context(), repo)
 	if result.status != pullFailed || !strings.Contains(result.detail, "$ git pull") {
@@ -326,5 +328,65 @@ func TestPullSessionEmptyAndInvalidDirectory(t *testing.T) {
 		}
 
 		<-session.done
+	}
+}
+
+func TestPullSkipsMismatchedUpstream(t *testing.T) {
+	for _, upstream := range []string{"origin/feature", "other/main"} {
+		t.Run(upstream, func(t *testing.T) {
+			source, checkout := pullTestCheckout(t)
+			before := cleanupTestGit(t, checkout, "rev-parse", "HEAD")
+			cleanupTestGit(t, source, "commit", "--allow-empty", "-m", "Advance remote")
+			cleanupTestGit(t, source, "branch", "feature")
+			cleanupTestGit(t, checkout, "remote", "add", "other", source)
+			cleanupTestGit(t, checkout, "fetch", "--all")
+			cleanupTestGit(t, checkout, "branch", "--set-upstream-to="+upstream, "main")
+
+			result := pullRepo(t.Context(), checkout)
+			if result.status != pullSkipped ||
+				!strings.Contains(result.detail, "does not match default branch") ||
+				strings.Contains(result.detail, "$ git pull") {
+				t.Fatalf("unexpected result: %+v", result)
+			}
+
+			if got := cleanupTestGit(t, checkout, "rev-parse", "HEAD"); got != before {
+				t.Fatal("mismatched upstream changed HEAD")
+			}
+		})
+	}
+}
+
+func TestPullMissingUpstream(t *testing.T) {
+	_, checkout := pullTestCheckout(t)
+	cleanupTestGit(t, checkout, "branch", "--unset-upstream")
+
+	result := pullRepo(t.Context(), checkout)
+	if result.status != pullFailed ||
+		!strings.Contains(result.detail, ErrNoUpstreamBranch.Error()) ||
+		strings.Contains(result.detail, "$ git pull") {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
+func TestPullSkipsDetachedHead(t *testing.T) {
+	_, checkout := pullTestCheckout(t)
+	cleanupTestGit(t, checkout, "checkout", "--detach")
+	before := cleanupTestGit(t, checkout, "rev-parse", "HEAD")
+
+	result := pullRepo(t.Context(), checkout)
+	if result.status != pullSkipped || !strings.Contains(result.detail, "detached HEAD") ||
+		strings.Contains(result.detail, "$ git pull") {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+
+	if got := cleanupTestGit(t, checkout, "rev-parse", "HEAD"); got != before {
+		t.Fatal("detached checkout changed")
+	}
+
+	model := pullModel{entries: []pullEntry{{result: result}}}
+
+	err := model.exitError()
+	if err != nil {
+		t.Fatalf("detached checkout failed the batch: %v", err)
 	}
 }
