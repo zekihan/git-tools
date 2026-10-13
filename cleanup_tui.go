@@ -23,6 +23,8 @@ const (
 	cleanupScrollStep    = 5
 )
 
+var errTooManyCleanupArgs = errors.New("too many arguments for cleanup command")
+
 type cleanupLoaded struct {
 	err     error
 	notice  string
@@ -76,7 +78,7 @@ func handleCleanupCmd(ctx context.Context, args []string) error {
 	}
 
 	if flags.NArg() > 1 {
-		return fmt.Errorf("%w: expected at most one directory", errTooManyWorktreeArgs)
+		return fmt.Errorf("%w: expected at most one directory", errTooManyCleanupArgs)
 	}
 
 	dir := "."

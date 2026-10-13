@@ -74,11 +74,6 @@ func run() int {
 		if err != nil {
 			return 1
 		}
-	case "worktreepath":
-		err := handleWorktreepathCmd(ctx, args[1:])
-		if err != nil {
-			return 1
-		}
 	case "repopath":
 		err := handleRepopathCmd(args[1:])
 		if err != nil {
@@ -106,8 +101,6 @@ func run() int {
 			printPullHelp()
 		case "clone":
 			printCloneHelp()
-		case "worktreepath":
-			printWorktreepathHelp()
 		case "repopath":
 			printRepopathHelp()
 		default:

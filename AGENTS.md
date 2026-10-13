@@ -33,10 +33,9 @@ This is a single-package Go CLI (`package main`) that provides git workflow util
 **Commands:**
 - `pull [dir]` — recursively finds all git repos under a directory (default `$HOME/repos`) and pulls each concurrently, controlled by `--threads`
 - `clone <url> [name]` — clones a repo into a structured path under `$HOME/repos/<host>/<user>/<repo>`
-- `worktreepath [-repo-url <url>] <branch>` — prints the calculated worktree path without creating it
 - `repopath <url> [name]` — prints the calculated clone path without cloning
 
-**Path convention:** Both repos and worktrees follow the same host/user/repo hierarchy derived from the git URL. `clone.go` implements URL parsing (HTTPS and SSH/git@ formats) and path derivation. `worktree.go` reuses the same derivation for `$HOME/worktrees/`.
+**Path convention:** Repositories follow a host/user/repo hierarchy derived from the git URL. `clone.go` implements URL parsing (HTTPS and SSH/git@ formats) and path derivation.
 
 **Concurrency model:** `pull.go` runs `pullRepo` goroutines bounded by a semaphore channel of size `--threads` (defaults to `runtime.NumCPU()`). Repos not on their default branch or with local changes emit warnings and are skipped without failing.
 

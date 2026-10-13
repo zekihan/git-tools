@@ -10,13 +10,7 @@ import (
 	"path/filepath"
 )
 
-var (
-	errRepoURLRequired     = errors.New("repository URL is required")
-	errBranchRequired      = errors.New("branch is required")
-	errTooManyWorktreeArgs = errors.New(
-		"too many arguments for worktreepath command; expected only <branch>",
-	)
-)
+var errRepoURLRequired = errors.New("repository URL is required")
 
 func handlePullCmd(ctx context.Context, args []string) error {
 	pullCmd := flag.NewFlagSet("pull", flag.ExitOnError)
@@ -114,82 +108,6 @@ func handleCloneCmd(ctx context.Context, args []string) error {
 	)
 
 	return nil
-}
-
-func handleWorktreepathCmd(ctx context.Context, args []string) error {
-	worktreepathCmd := flag.NewFlagSet("worktreepath", flag.ExitOnError)
-	repoURLFlag := worktreepathCmd.String(
-		"repo-url",
-		"",
-		"Repository URL to use when outside a git repository",
-	)
-	worktreepathCmd.Usage = printWorktreepathHelp
-
-	err := worktreepathCmd.Parse(args)
-	if err != nil {
-		slog.ErrorContext(ctx, "Error parsing worktreepath command", slog.Any("error", err))
-
-		return fmt.Errorf("error parsing worktreepath command: %w", err)
-	}
-
-	repoURL, branch, err := parseWorktreeArgs(*repoURLFlag, worktreepathCmd.Args())
-	if err != nil {
-		slog.ErrorContext(ctx, "Invalid worktreepath arguments", slog.Any("error", err))
-		worktreepathCmd.Usage()
-
-		return err
-	}
-
-	if repoURL == "" {
-		_, repoURL, err = getCurrentRepoInfo(ctx)
-		if err != nil {
-			return toWorktreeRepoContextErr(err)
-		}
-	}
-
-	calculatedPath, err := getWorktreePath(repoURL, branch)
-	if err != nil {
-		slog.ErrorContext(
-			ctx,
-			"Error calculating worktree path",
-			slog.String("url", repoURL),
-			slog.String("branch", branch),
-			slog.Any("error", err),
-		)
-
-		return err
-	}
-
-	fmt.Println(calculatedPath)
-
-	slog.DebugContext(
-		ctx,
-		"Successfully calculated worktree path",
-		slog.String("url", repoURL),
-		slog.String("branch", branch),
-		slog.String("path", calculatedPath),
-	)
-
-	return nil
-}
-
-func toWorktreeRepoContextErr(err error) error {
-	if errors.Is(err, ErrNotInsideGitRepo) {
-		return fmt.Errorf("%w", ErrRepoURLOrGitRepoContext)
-	}
-
-	return err
-}
-
-func parseWorktreeArgs(repoURL string, args []string) (string, string, error) {
-	switch len(args) {
-	case 0:
-		return "", "", fmt.Errorf("%w", errBranchRequired)
-	case 1:
-		return repoURL, args[0], nil
-	default:
-		return "", "", fmt.Errorf("%w", errTooManyWorktreeArgs)
-	}
 }
 
 func handleRepopathCmd(args []string) error {
