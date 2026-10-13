@@ -390,3 +390,32 @@ func TestPullSkipsDetachedHead(t *testing.T) {
 		t.Fatalf("detached checkout failed the batch: %v", err)
 	}
 }
+
+func TestPullHandlesBranchTagCollisions(t *testing.T) {
+	for _, tag := range []string{"main", "origin/main"} {
+		t.Run(tag, func(t *testing.T) {
+			source, checkout := pullTestCheckout(t)
+			cleanupTestGit(t, checkout, "update-ref", "refs/tags/"+tag, "HEAD")
+			cleanupTestGit(t, source, "commit", "--allow-empty", "-m", "Advance source")
+
+			result := pullRepo(t.Context(), checkout)
+			if result.status != pullSucceeded || result.branch != "main" {
+				t.Fatalf("pull with colliding tag failed: %+v", result)
+			}
+
+			if got, want := cleanupTestGit(
+				t,
+				checkout,
+				"rev-parse",
+				"HEAD",
+			), cleanupTestGit(
+				t,
+				source,
+				"rev-parse",
+				"HEAD",
+			); got != want {
+				t.Fatalf("checkout did not advance: got %s, want %s", got, want)
+			}
+		})
+	}
+}

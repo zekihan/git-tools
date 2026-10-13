@@ -104,7 +104,7 @@ func pullRepository(result *pullResult, run func(...string) (string, error)) str
 		result.remote = defaultRemoteName
 	}
 
-	result.branch, err = run("symbolic-ref", "--quiet", "--short", "HEAD")
+	result.branch, err = run("symbolic-ref", "--quiet", "HEAD")
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
@@ -116,22 +116,23 @@ func pullRepository(result *pullResult, run func(...string) (string, error)) str
 		return err.Error()
 	}
 
+	result.branch = strings.TrimPrefix(result.branch, "refs/heads/")
 	headRef := "refs/remotes/" + result.remote + "/HEAD"
 
-	branch, err := run("symbolic-ref", "--short", headRef)
+	branch, err := run("symbolic-ref", headRef)
 	if err != nil {
 		_, err = run("remote", "set-head", result.remote, "-a")
 		if err != nil {
 			return err.Error()
 		}
 
-		branch, err = run("symbolic-ref", "--short", headRef)
+		branch, err = run("symbolic-ref", headRef)
 		if err != nil {
 			return err.Error()
 		}
 	}
 
-	branch = strings.TrimPrefix(branch, result.remote+"/")
+	branch = strings.TrimPrefix(branch, "refs/remotes/"+result.remote+"/")
 	if branch == "" {
 		return ErrNoUpstreamBranch.Error()
 	}
