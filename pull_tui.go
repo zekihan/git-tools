@@ -85,15 +85,16 @@ func handlePullCmd(ctx context.Context, args []string) error {
 }
 
 type pullModel struct {
+	err             error
 	session         *pullSession
 	cancel          context.CancelFunc
-	err             error
 	dir             string
 	entries         []pullEntry
+	width           int
 	cursor          int
 	offset          int
-	width           int
 	height          int
+	hideSucceeded   bool
 	scanning        bool
 	done            bool
 	stopping        bool
@@ -130,7 +131,9 @@ func (model *pullModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return model, model.session.next
 	case pullFinishedMsg:
+		selected := model.selectedIndex()
 		model.entries[msg.index].result = msg.result
+		model.selectEntry(selected)
 
 		return model, model.session.next
 	case pullDoneMsg:
@@ -168,11 +171,16 @@ func (model *pullModel) key(key string) tea.Cmd {
 
 		model.stopping = true
 		model.cancel()
+	case "h":
+		selected := model.selectedIndex()
+		model.hideSucceeded = !model.hideSucceeded
+		model.selectEntry(selected)
+		model.offset = 0
 	case "up", "k":
 		model.cursor = max(0, model.cursor-1)
 		model.offset = 0
 	case "down", "j":
-		model.cursor = max(0, min(len(model.entries)-1, model.cursor+1))
+		model.cursor = max(0, min(len(model.visibleIndices())-1, model.cursor+1))
 		model.offset = 0
 	case "pgup":
 		model.offset = max(0, model.offset-tuiScrollStep)
@@ -205,4 +213,38 @@ func (model *pullModel) exitError() error {
 	}
 
 	return nil
+}
+
+func (model *pullModel) visibleIndices() []int {
+	indices := make([]int, 0, len(model.entries))
+	for index, entry := range model.entries {
+		if !model.hideSucceeded || entry.result.status != pullSucceeded {
+			indices = append(indices, index)
+		}
+	}
+
+	return indices
+}
+
+func (model *pullModel) selectedIndex() int {
+	indices := model.visibleIndices()
+	if model.cursor < 0 || model.cursor >= len(indices) {
+		return -1
+	}
+
+	return indices[model.cursor]
+}
+
+func (model *pullModel) selectEntry(selected int) {
+	indices := model.visibleIndices()
+	for cursor, index := range indices {
+		if index == selected {
+			model.cursor = cursor
+
+			return
+		}
+	}
+
+	model.cursor = max(0, min(model.cursor, len(indices)-1))
+	model.offset = 0
 }

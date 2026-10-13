@@ -33,6 +33,7 @@ func printPullHelp() {
 	fmt.Println(
 		"j/k or arrows: select; PgUp/PgDown: scroll Git output; q: quit and cancel pending work.",
 	)
+	fmt.Println("h: toggle hiding successfully pulled repositories; totals include hidden results.")
 	fmt.Println("Results stay open until you quit. Requires an interactive terminal.")
 }
 

@@ -51,6 +51,11 @@ func renderPull(model *pullModel) string {
 		notice = "Finished. " + notice
 	}
 
+	filterHelp := "h hide pulled"
+	if model.hideSucceeded {
+		filterHelp = "h show pulled"
+	}
+
 	return header + "\n" + styles.muted.Render(
 		tuiClip(model.dir, model.width),
 	) + "\n\n" + panes + "\n" +
@@ -58,7 +63,7 @@ func renderPull(model *pullModel) string {
 			tuiClip(notice, model.width),
 		) + "\n" +
 		tuiClip(
-			"j/k or arrows: select  PgUp/PgDown: details  q: quit",
+			"j/k select  PgUp/Dn details  "+filterHelp+"  q quit",
 			model.width,
 		) + "\n"
 }
@@ -98,12 +103,19 @@ func pullStatusStyle(status pullStatus, styles *tuiStyles) lipgloss.Style {
 
 func renderPullList(model *pullModel, width, height int, styles *tuiStyles) string {
 	inner := width - tuiPanelFrame
-	lines := []string{styles.heading.Render("REPOSITORIES"), ""}
+
+	heading := "REPOSITORIES"
+	if model.hideSucceeded {
+		heading += " (filtered)"
+	}
+
+	lines := []string{styles.heading.Render(tuiClip(heading, inner)), ""}
+	indices := model.visibleIndices()
 	count := max(1, (height-tuiPanelFrame-1)/tuiItemHeight)
 
-	start := min(max(0, model.cursor-count/2), max(0, len(model.entries)-count))
-	for index := start; index < min(len(model.entries), start+count); index++ {
-		entry := model.entries[index]
+	start := min(max(0, model.cursor-count/2), max(0, len(indices)-count))
+	for index := start; index < min(len(indices), start+count); index++ {
+		entry := model.entries[indices[index]]
 
 		name, err := filepath.Rel(model.dir, entry.path)
 		if err != nil || name == "." {
@@ -133,8 +145,12 @@ func renderPullList(model *pullModel, width, height int, styles *tuiStyles) stri
 		)
 	}
 
-	if len(model.entries) == 0 {
+	if len(indices) == 0 {
 		text := "No repositories."
+		if model.hideSucceeded && len(model.entries) > 0 {
+			text = "All pulled; h shows all."
+		}
+
 		if model.scanning {
 			text = "Scanning..."
 		}
@@ -147,17 +163,18 @@ func renderPullList(model *pullModel, width, height int, styles *tuiStyles) stri
 	}
 
 	lines = append(lines, styles.muted.Render(tuiClip(fmt.Sprintf("%d / %d repositories",
-		min(model.cursor+1, len(model.entries)), len(model.entries)), inner)))
+		min(model.cursor+1, len(indices)), len(indices)), inner)))
 
 	return tuiPanel(strings.Join(lines, "\n"), width, height, true, styles)
 }
 
 func (model *pullModel) detailLines() []string {
-	if len(model.entries) == 0 {
+	selected := model.selectedIndex()
+	if selected < 0 {
 		return []string{"Select a repository to see details."}
 	}
 
-	entry := model.entries[model.cursor]
+	entry := model.entries[selected]
 
 	detail := entry.result.detail
 	if detail == "" {
