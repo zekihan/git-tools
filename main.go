@@ -85,6 +85,8 @@ func run() int {
 	case "cleanup":
 		err := handleCleanupCmd(ctx, args[1:])
 		if err != nil {
+			slog.ErrorContext(ctx, "Cleanup failed", slog.Any("error", err))
+
 			return 1
 		}
 	case "version":

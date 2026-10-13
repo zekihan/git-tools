@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -112,8 +111,6 @@ func handleCleanupCmd(ctx context.Context, args []string) error {
 
 	_, err = tea.NewProgram(model, tea.WithContext(ctx), tea.WithColorProfile(profile)).Run()
 	if err != nil {
-		slog.ErrorContext(ctx, "Cleanup failed", slog.Any("error", err))
-
 		return fmt.Errorf("run cleanup: %w", err)
 	}
 
