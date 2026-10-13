@@ -440,3 +440,35 @@ func TestCleanupDirectoryScanFiltersRepositories(t *testing.T) {
 		t.Fatalf("single repository scope changed: %v, %v", entries, err)
 	}
 }
+
+func TestCleanupBranchTagCollision(t *testing.T) {
+	repo := cleanupTestRepo(t)
+	cleanupTestGit(t, repo, "update-ref", "refs/tags/main", "HEAD")
+
+	candidates, err := cleanupRepoHasCandidates(t.Context(), repo)
+	if err != nil || candidates {
+		t.Fatalf("tag produced phantom candidate: %v, %v", candidates, err)
+	}
+
+	cleanupTestGit(t, repo, "branch", "feature", "HEAD")
+	cleanupTestGit(t, repo, "update-ref", "refs/tags/feature", "HEAD")
+
+	entry := cleanupTestEntry(t, repo, "feature")
+
+	err = cleanupDelete(t.Context(), entry, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if branch := cleanupTestGit(t, repo, "branch", "--list", "feature"); branch != "" {
+		t.Fatal("branch was retained")
+	}
+
+	cleanupTestGit(t, repo, "rev-parse", "--verify", "refs/tags/feature")
+	cleanupTestGit(t, repo, "checkout", "-b", "other", "HEAD")
+
+	entry = cleanupTestEntry(t, repo, "main")
+	if entry.blocked != "default branch" {
+		t.Fatal("tag collision bypassed default branch protection")
+	}
+}

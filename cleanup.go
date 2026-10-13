@@ -69,7 +69,13 @@ func cleanupRepoHasCandidates(ctx context.Context, repo string) (bool, error) {
 		return true, nil
 	}
 
-	output, err = cleanupGit(ctx, repo, "for-each-ref", "--format=%(refname:short)", "refs/heads/")
+	output, err = cleanupGit(
+		ctx,
+		repo,
+		"for-each-ref",
+		"--format=%(refname:lstrip=2)",
+		"refs/heads/",
+	)
 	if err != nil {
 		return false, err
 	}
@@ -164,7 +170,7 @@ func cleanupEntriesForRepo(ctx context.Context, repo string) ([]cleanupEntry, er
 		ctx,
 		repo,
 		"for-each-ref",
-		"--format=%(refname:short) %(objectname)",
+		"--format=%(refname:lstrip=2) %(objectname)",
 		"refs/heads/",
 	)
 	if err != nil {
