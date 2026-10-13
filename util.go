@@ -8,18 +8,6 @@ import (
 	"path/filepath"
 )
 
-// isGitDir checks if a directory is a Git repository.
-func isGitDir(dir string) bool {
-	gitPath := filepath.Join(dir, ".git")
-
-	info, err := os.Stat(gitPath)
-	if err != nil {
-		return false
-	}
-
-	return info.IsDir() || info.Mode().IsRegular()
-}
-
 // findGitRepos recursively discovers repositories without entering their Git metadata.
 func findGitRepos(ctx context.Context, searchDir string) ([]string, error) {
 	err := ctx.Err()
@@ -50,11 +38,6 @@ func findGitRepos(ctx context.Context, searchDir string) ([]string, error) {
 		}
 
 		fullPath := filepath.Join(searchDir, entry.Name())
-		if isGitDir(fullPath) {
-			repos = append(repos, fullPath)
-
-			continue
-		}
 
 		subRepos, err := findGitRepos(ctx, fullPath)
 		if err != nil {
