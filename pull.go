@@ -17,7 +17,6 @@ const (
 
 var (
 	ErrNoRemoteFound        = errors.New("no remote found")
-	ErrNoRemotesFound       = errors.New("no remotes found")
 	ErrNoUpstreamBranch     = errors.New("no upstream branch found")
 	ErrNotOnDefaultBranch   = errors.New("not on default branch")
 	ErrLocalChangesDetected = errors.New("local changes detected")
@@ -143,10 +142,6 @@ func validateAndGetRemoteName(ctx context.Context, dir string) (string, error) {
 		if remote != "" {
 			remotes = append(remotes, remote)
 		}
-	}
-
-	if len(remotes) == 0 {
-		return "", fmt.Errorf("%w", ErrNoRemotesFound)
 	}
 
 	var remoteName string

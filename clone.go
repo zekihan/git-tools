@@ -16,11 +16,9 @@ const (
 )
 
 var (
-	ErrUnsupportedGitURL     = errors.New("unsupported Git URL format: Please use HTTPS or SSH")
-	ErrFailedExtractHostname = errors.New("failed to extract hostname from the URL")
-	ErrFailedExtractRepoName = errors.New("failed to extract repository name from the URL")
-	ErrRepoAlreadyExists     = errors.New("repository already exists")
-	ErrDirAlreadyExists      = errors.New(
+	ErrUnsupportedGitURL = errors.New("unsupported Git URL format: Please use HTTPS or SSH")
+	ErrRepoAlreadyExists = errors.New("repository already exists")
+	ErrDirAlreadyExists  = errors.New(
 		"directory already exists. Please remove it before cloning again",
 	)
 )
@@ -140,16 +138,8 @@ func parseRepoParts(repoURL, name string) (repoParts, error) {
 		return repoParts{}, fmt.Errorf("%w: %s", ErrUnsupportedGitURL, repoURL)
 	}
 
-	if hostname == "" {
-		return repoParts{}, fmt.Errorf("%w: %s", ErrFailedExtractHostname, repoURL)
-	}
-
 	if name != "" {
 		repo = name
-	}
-
-	if repo == "" {
-		return repoParts{}, fmt.Errorf("%w: %s", ErrFailedExtractRepoName, repoURL)
 	}
 
 	userRepo := repo

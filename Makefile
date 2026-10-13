@@ -1,8 +1,6 @@
 # Change these variables as necessary.
 MAIN_PACKAGE_PATH := $(shell pwd)
 BINARY_NAME := $(shell basename $(MAIN_PACKAGE_PATH))
-OS_INFO := $(shell uname -s | tr '[:upper:]' '[:lower:]')
-ARCH_INFO := $(shell uname -m | sed 's/x86_64/amd64/')
 TMP_DIR := ./tmp
 GO_EXECUTABLE := go
 

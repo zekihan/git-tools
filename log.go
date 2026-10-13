@@ -27,7 +27,7 @@ func initLogger(logLevel string) {
 	}
 
 	// Initialize the logger. Logs go to stderr so commands that print their
-	// result to stdout (e.g. repopath, worktreepath) stay capturable in shells.
+	// result to stdout (e.g. repopath) stay capturable in shells.
 	logger := slog.New(
 		tint.NewTextHandler(os.Stderr, &tint.Options{Level: level, TimeFormat: time.RFC3339}),
 	)
