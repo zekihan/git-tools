@@ -274,17 +274,17 @@ func TestCleanupConfirmationFlow(t *testing.T) {
 
 //nolint:noinlineerr // Keep assertions next to the operation being verified.
 func TestCleanupPreviewBoundedAndSanitized(t *testing.T) {
-	var buffer cleanupBuffer
+	var buffer commandBuffer
 
-	data := []byte(strings.Repeat("x", cleanupPreviewLimit*2))
+	data := []byte(strings.Repeat("x", commandOutputLimit*2))
 	if size, err := buffer.Write(
 		data,
 	); err != nil || size != len(data) ||
-		buffer.Len() != cleanupPreviewLimit {
+		buffer.Len() != commandOutputLimit {
 		t.Fatalf("buffer size = %d, len = %d, error = %v", size, buffer.Len(), err)
 	}
 
-	if strings.ContainsRune(cleanupText("hello\x1b[2J\x07"), '\x1b') {
+	if strings.ContainsRune(tuiText("hello\x1b[2J\x07"), '\x1b') {
 		t.Fatal("terminal escape survived sanitization")
 	}
 }

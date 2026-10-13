@@ -4,267 +4,158 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
+	"os"
+	"os/exec"
 	"slices"
 	"strings"
-	"sync"
-	"sync/atomic"
+	"time"
 )
 
+const defaultRemoteName = "origin"
+
+type pullStatus string
+
 const (
-	defaultRemoteName = "origin"
+	pullQueued    pullStatus = "queued"
+	pullRunning   pullStatus = "pulling"
+	pullSucceeded pullStatus = "pulled"
+	pullSkipped   pullStatus = "skipped"
+	pullFailed    pullStatus = "errored"
+	pullCanceled  pullStatus = "canceled"
 )
 
 var (
-	ErrNoRemoteFound        = errors.New("no remote found")
-	ErrNoUpstreamBranch     = errors.New("no upstream branch found")
-	ErrNotOnDefaultBranch   = errors.New("not on default branch")
-	ErrLocalChangesDetected = errors.New("local changes detected")
-	ErrSomeReposFailed      = errors.New("one or more repositories failed to pull")
+	ErrNoRemoteFound    = errors.New("no remote found")
+	ErrNoUpstreamBranch = errors.New("no upstream branch found")
+	ErrSomeReposFailed  = errors.New("one or more repositories failed to pull")
+	errInvalidThreads   = errors.New("threads must be greater than zero")
+	errPullTerminal     = errors.New("pull requires an interactive terminal")
+	errPullArguments    = errors.New("pull expects at most one directory")
 )
 
-// pullRepo performs git operations in the specified directory.
-func pullRepo(ctx context.Context, dir string) (bool, error) {
-	remoteName, err := validateAndGetRemoteName(ctx, dir)
-	if err != nil {
-		slog.DebugContext(
-			ctx,
-			"Error validating remote name",
-			slog.String("dir", dir),
-			slog.Any("error", err),
-		)
-
-		return false, fmt.Errorf("error validating remote name: %w", err)
-	}
-
-	// Skip if not in main or master branch.
-	localBranchOutput, err := runCommand(ctx, dir, "git", "symbolic-ref", "--short", "HEAD")
-	if err != nil {
-		slog.DebugContext(
-			ctx,
-			"Error getting current branch",
-			slog.String("dir", dir),
-			slog.Any("error", err),
-			slog.String("output", localBranchOutput),
-		)
-
-		return false, fmt.Errorf("error getting current branch: %w", err)
-	}
-
-	remoteBranchOutput, err := getDefaultBranch(ctx, dir, remoteName)
-	if err != nil {
-		slog.DebugContext(
-			ctx,
-			"Error getting default branch",
-			slog.String("dir", dir),
-			slog.Any("error", err),
-		)
-
-		return false, err
-	}
-
-	if localBranchOutput != remoteBranchOutput {
-		return true, fmt.Errorf(
-			"%w: local %s, remote %s",
-			ErrNotOnDefaultBranch,
-			localBranchOutput,
-			remoteBranchOutput,
-		)
-	}
-
-	// Skip if there are local changes.
-	statusOutput, err := runCommand(
-		ctx,
-		dir,
-		"git",
-		"status",
-		"--porcelain",
-		"--untracked-files=no",
-	)
-	if err != nil {
-		slog.DebugContext(
-			ctx,
-			"Error checking status",
-			slog.String("dir", dir),
-			slog.Any("error", err),
-			slog.String("output", statusOutput),
-		)
-
-		return false, fmt.Errorf("error checking status: %w", err)
-	}
-
-	if statusOutput != "" {
-		return true, fmt.Errorf("%w", ErrLocalChangesDetected)
-	}
-
-	slog.InfoContext(ctx, "Pulling in repo", slog.String("repo", dir))
-
-	pullOutput, err := runCommand(ctx, dir, "git", "pull")
-	if err != nil {
-		slog.DebugContext(
-			ctx,
-			"Error pulling",
-			slog.String("dir", dir),
-			slog.Any("error", err),
-			slog.String("output", pullOutput),
-		)
-
-		return false, fmt.Errorf("error pulling: %w", err)
-	}
-
-	return true, nil
+type pullResult struct {
+	status  pullStatus
+	branch  string
+	remote  string
+	detail  string
+	elapsed time.Duration
 }
 
-func validateAndGetRemoteName(ctx context.Context, dir string) (string, error) {
-	// Check if there is a remote.
-	remoteOutput, err := runCommand(ctx, dir, "git", "remote")
-	if err != nil {
-		slog.DebugContext(
-			ctx,
-			"Error checking remotes",
-			slog.String("dir", dir),
-			slog.Any("error", err),
-			slog.String("output", remoteOutput),
-		)
+// pullRepo captures its own transcript so concurrent Git commands never write over the UI.
+func pullRepo(ctx context.Context, dir string) pullResult {
+	started := time.Now()
 
-		return "", fmt.Errorf("error checking remotes: %w", err)
-	}
+	var transcript commandBuffer
 
-	if remoteOutput == "" {
-		return "", fmt.Errorf("%w", ErrNoRemoteFound)
-	}
+	result := pullResult{status: pullFailed}
 
-	remotesRaw := strings.Split(remoteOutput, "\n")
-	remotes := make([]string, 0)
+	run := func(args ...string) (string, error) {
+		_, _ = fmt.Fprintf(&transcript, "$ git %s\n", strings.Join(args, " "))
+		cmd := exec.CommandContext(ctx, "git", args...)
+		cmd.Dir = dir
 
-	for _, remote := range remotesRaw {
-		remote = strings.TrimSpace(remote)
-		if remote != "" {
-			remotes = append(remotes, remote)
-		}
-	}
+		cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GCM_INTERACTIVE=never")
+		cmd.WaitDelay = time.Second
 
-	var remoteName string
-	if slices.Contains(remotes, defaultRemoteName) {
-		remoteName = defaultRemoteName
-		slog.DebugContext(
-			ctx,
-			"Default remote found",
-			slog.String("dir", dir),
-			slog.String("remote", remoteName),
-			slog.Any("remotes", remotes),
-		)
-	} else {
-		remoteName = remotes[0]
-		slog.DebugContext(
-			ctx,
-			"Default remote not found, using first remote",
-			slog.String("dir", dir),
-			slog.String("remote", remoteName),
-			slog.Any("remotes", remotes),
-		)
-	}
+		var output commandBuffer
 
-	return remoteName, nil
-}
+		cmd.Stdout, cmd.Stderr = &output, &output
+		err := cmd.Run()
 
-// getDefaultBranch resolves the remote's default branch name (e.g. "main").
-//
-// It prefers the locally recorded refs/remotes/<remote>/HEAD to avoid a network
-// round-trip, and only queries the remote via "git remote set-head -a" when that
-// symbolic ref is not yet established.
-func getDefaultBranch(ctx context.Context, dir, remoteName string) (string, error) {
-	headRef := "refs/remotes/" + remoteName + "/HEAD"
-
-	branchOutput, err := runCommand(ctx, dir, "git", "symbolic-ref", "--short", headRef)
-	if err != nil {
-		setHeadOutput, setErr := runCommand(ctx, dir, "git", "remote", "set-head", remoteName, "-a")
-		if setErr != nil {
-			slog.DebugContext(
-				ctx,
-				"Error setting remote default branch",
-				slog.String("dir", dir),
-				slog.Any("error", setErr),
-				slog.String("output", setHeadOutput),
-			)
-
-			return "", fmt.Errorf("error setting remote default branch: %w", setErr)
+		text := strings.TrimSpace(output.String())
+		if text != "" {
+			_, _ = fmt.Fprintln(&transcript, text)
 		}
 
-		branchOutput, err = runCommand(ctx, dir, "git", "symbolic-ref", "--short", headRef)
 		if err != nil {
-			slog.DebugContext(
-				ctx,
-				"Error getting default branch",
-				slog.String("dir", dir),
-				slog.Any("error", err),
-				slog.String("output", branchOutput),
-			)
+			return "", fmt.Errorf("git %s: %w", strings.Join(args, " "), err)
+		}
 
-			return "", fmt.Errorf("error getting default branch: %w", err)
+		return text, nil
+	}
+	result.detail = pullRepository(&result, run)
+
+	result.elapsed = time.Since(started)
+	if transcript.Len() == commandOutputLimit {
+		result.detail = "[output truncated]\n" + result.detail
+	}
+
+	result.detail = transcript.String() + result.detail
+	if ctx.Err() != nil {
+		result.status = pullCanceled
+	}
+
+	return result
+}
+
+func pullRepository(result *pullResult, run func(...string) (string, error)) string {
+	output, err := run("remote")
+	if err != nil {
+		return err.Error()
+	}
+
+	remotes := strings.Fields(output)
+	if len(remotes) == 0 {
+		return ErrNoRemoteFound.Error()
+	}
+
+	result.remote = remotes[0]
+	if slices.Contains(remotes, defaultRemoteName) {
+		result.remote = defaultRemoteName
+	}
+
+	result.branch, err = run("symbolic-ref", "--short", "HEAD")
+	if err != nil {
+		return err.Error()
+	}
+
+	headRef := "refs/remotes/" + result.remote + "/HEAD"
+
+	branch, err := run("symbolic-ref", "--short", headRef)
+	if err != nil {
+		_, err = run("remote", "set-head", result.remote, "-a")
+		if err != nil {
+			return err.Error()
+		}
+
+		branch, err = run("symbolic-ref", "--short", headRef)
+		if err != nil {
+			return err.Error()
 		}
 	}
 
-	branch := strings.TrimPrefix(branchOutput, remoteName+"/")
+	branch = strings.TrimPrefix(branch, result.remote+"/")
 	if branch == "" {
-		return "", fmt.Errorf("%w", ErrNoUpstreamBranch)
+		return ErrNoUpstreamBranch.Error()
 	}
 
-	return branch, nil
-}
+	if result.branch != branch {
+		result.status = pullSkipped
 
-func pullAll(ctx context.Context, absSearchDir string, threadCount int) error {
-	repos, err := findGitRepos(absSearchDir)
+		return fmt.Sprintf(
+			"Skipped: branch %s is not the default branch %s.",
+			result.branch,
+			branch,
+		)
+	}
+
+	output, err = run("status", "--porcelain", "--untracked-files=no")
 	if err != nil {
-		return fmt.Errorf("error walking directory %s: %w", absSearchDir, err)
+		return err.Error()
 	}
 
-	var (
-		wg       sync.WaitGroup
-		failures atomic.Int64
-	)
+	if output != "" {
+		result.status = pullSkipped
 
-	semaphore := make(chan struct{}, threadCount) // Limit to threadCount concurrent operations
-	defer close(semaphore)
-
-	wg.Add(len(repos))
-
-	for _, repo := range repos {
-		semaphore <- struct{}{} // Acquire a slot
-
-		go func(repo string) {
-			defer wg.Done()
-			defer func() { <-semaphore }() // Release the slot
-
-			ok, err := pullRepo(ctx, repo)
-			switch {
-			case !ok && err != nil:
-				failures.Add(1)
-
-				slog.ErrorContext(
-					ctx,
-					"Error pulling in repo",
-					slog.String("repo", repo),
-					slog.Any("error", err),
-				)
-			case ok && err != nil:
-				slog.WarnContext(
-					ctx,
-					"Warning while pulling in repo",
-					slog.String("repo", repo),
-					slog.Any("error", err),
-				)
-			default:
-				slog.InfoContext(ctx, "Pulled in repo", slog.String("repo", repo))
-			}
-		}(repo)
+		return "Skipped: repository has local changes."
 	}
 
-	wg.Wait() // Wait for all goroutines to finish
-
-	if n := failures.Load(); n > 0 {
-		return fmt.Errorf("%w: %d failed", ErrSomeReposFailed, n)
+	_, err = run("pull")
+	if err != nil {
+		return err.Error()
 	}
 
-	return nil
+	result.status = pullSucceeded
+
+	return "Pull completed."
 }

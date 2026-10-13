@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"runtime"
@@ -67,6 +68,8 @@ func run() int {
 	case "pull":
 		err := handlePullCmd(ctx, args[1:])
 		if err != nil {
+			slog.ErrorContext(ctx, "Pull failed", slog.Any("error", err))
+
 			return 1
 		}
 	case "clone":

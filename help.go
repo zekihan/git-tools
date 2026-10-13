@@ -10,7 +10,7 @@ func printGlobalHelp() {
 	fmt.Println("\nGlobal options:")
 	flag.PrintDefaults() // Prints global flags
 	fmt.Println("\nAvailable commands:")
-	fmt.Println("  pull           Recursively pulls git repositories in a directory.")
+	fmt.Println("  pull           Interactively pulls git repositories in a directory.")
 	fmt.Println("  clone          Clones a git repository into a structured directory.")
 	fmt.Println("  repopath       Calculates and prints the local path for a git repository.")
 	fmt.Println(
@@ -25,8 +25,15 @@ func printGlobalHelp() {
 
 func printPullHelp() {
 	fmt.Printf("Usage: git-tools pull [directory]\n\n")
-	fmt.Printf("Recursively pulls git repositories in a directory.\n")
-	fmt.Printf("If no directory is specified, it defaults to $HOME/repos.\n\n")
+	fmt.Printf("Interactively pulls git repositories in a directory.\n")
+	fmt.Printf("If no directory is specified, it defaults to $HOME/repos.\n")
+	fmt.Println("Pulls start automatically, limited by the global --threads option.")
+	fmt.Println("Shows queued, pulling, pulled, skipped, and errored repositories.")
+	fmt.Println("Changed repositories and non-default branches are skipped.")
+	fmt.Println(
+		"j/k or arrows: select; PgUp/PgDown: scroll Git output; q: quit and cancel pending work.",
+	)
+	fmt.Println("Results stay open until you quit. Requires an interactive terminal.")
 }
 
 func printCloneHelp() {

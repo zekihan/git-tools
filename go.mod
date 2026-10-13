@@ -8,6 +8,7 @@ require (
 	github.com/charmbracelet/colorprofile v0.4.3
 	github.com/charmbracelet/x/ansi v0.11.9
 	github.com/lmittmann/tint v1.2.1
+	github.com/mattn/go-isatty v0.0.20
 )
 
 require (

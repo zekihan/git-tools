@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -14,7 +13,6 @@ import (
 var errCleanupUnsafe = errors.New("cleanup refused")
 
 const (
-	cleanupPreviewLimit = 16384
 	cleanupWorktreeKind = "worktree"
 )
 
@@ -23,7 +21,11 @@ type cleanupEntry struct {
 }
 
 func cleanupGit(ctx context.Context, dir string, args ...string) (string, error) {
-	output, err := runCommand(ctx, dir, "git", args...)
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = dir
+	raw, err := cmd.CombinedOutput()
+
+	output := strings.TrimSpace(string(raw))
 	if err != nil {
 		return "", fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, output)
 	}
@@ -51,7 +53,7 @@ func cleanupRepos(ctx context.Context, dir string) ([]string, bool, error) {
 		return []string{root}, true, nil
 	}
 
-	repos, err := findGitRepos(dir)
+	repos, err := findGitRepos(ctx, dir)
 
 	return repos, false, err
 }
@@ -222,24 +224,11 @@ func parseCleanupWorktrees(output, repo, base string) []cleanupEntry {
 	return entries
 }
 
-type cleanupBuffer struct{ bytes.Buffer }
-
-func (buffer *cleanupBuffer) Write(data []byte) (int, error) {
-	size := len(data)
-
-	remaining := cleanupPreviewLimit - buffer.Len()
-	if remaining > 0 {
-		_, _ = buffer.Buffer.Write(data[:min(remaining, size)])
-	}
-
-	return size, nil
-}
-
 func cleanupDiff(ctx context.Context, dir string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
 
-	var output cleanupBuffer
+	var output commandBuffer
 
 	cmd.Stdout = &output
 
@@ -251,7 +240,7 @@ func cleanupDiff(ctx context.Context, dir string, args ...string) (string, error
 	}
 
 	result := output.String()
-	if output.Len() == cleanupPreviewLimit {
+	if output.Len() == commandOutputLimit {
 		result += "\n[preview truncated]"
 	}
 

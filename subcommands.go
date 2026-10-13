@@ -6,55 +6,9 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
-	"os"
-	"path/filepath"
 )
 
 var errRepoURLRequired = errors.New("repository URL is required")
-
-func handlePullCmd(ctx context.Context, args []string) error {
-	pullCmd := flag.NewFlagSet("pull", flag.ExitOnError)
-	pullCmd.Usage = printPullHelp
-
-	err := pullCmd.Parse(args)
-	if err != nil {
-		slog.ErrorContext(ctx, "Error parsing pull command", slog.Any("error", err))
-
-		return fmt.Errorf("error parsing pull command: %w", err)
-	}
-
-	searchDir := "$HOME/repos"
-	if pullCmd.NArg() > 0 {
-		searchDir = pullCmd.Arg(0)
-	}
-
-	searchDir = os.ExpandEnv(searchDir)
-
-	absSearchDir, err := filepath.Abs(searchDir)
-	if err != nil {
-		slog.ErrorContext(
-			ctx,
-			"Error getting absolute path",
-			slog.String("dir", searchDir),
-			slog.Any("error", err),
-		)
-
-		return fmt.Errorf("error getting absolute path for %s: %w", searchDir, err)
-	}
-
-	slog.InfoContext(ctx, "Starting git pull script", slog.String("dir", absSearchDir))
-
-	err = pullAll(ctx, absSearchDir, *threadCount)
-	if err != nil {
-		slog.ErrorContext(ctx, "Error running git pull", slog.Any("error", err))
-
-		return err
-	}
-
-	slog.InfoContext(ctx, "Git pull script completed", slog.String("dir", absSearchDir))
-
-	return nil
-}
 
 func handleCloneCmd(ctx context.Context, args []string) error {
 	cloneCmd := flag.NewFlagSet("clone", flag.ExitOnError)

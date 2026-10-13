@@ -9,18 +9,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"unicode"
 
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
 
 	tea "charm.land/bubbletea/v2"
-)
-
-const (
-	cleanupInitialWidth  = 80
-	cleanupInitialHeight = 24
-	cleanupScrollStep    = 5
 )
 
 var errTooManyCleanupArgs = errors.New("too many arguments for cleanup command")
@@ -98,7 +91,7 @@ func handleCleanupCmd(ctx context.Context, args []string) error {
 		}
 	}
 
-	profile, noColor := cleanupColorProfile(
+	profile, noColor := tuiColorProfile(
 		colorprofile.Detect(os.Stdout, os.Environ()),
 		os.Getenv("NO_COLOR"), os.Getenv("CLICOLOR"), os.Getenv("CLICOLOR_FORCE"),
 	)
@@ -106,10 +99,10 @@ func handleCleanupCmd(ctx context.Context, args []string) error {
 	model := cleanupModel{
 		ctx:             ctx,
 		dir:             dir,
-		width:           cleanupInitialWidth,
-		height:          cleanupInitialHeight,
+		width:           tuiInitialWidth,
+		height:          tuiInitialHeight,
 		loading:         true,
-		lightBackground: cleanupLightBackground(os.Getenv("COLORFGBG")),
+		lightBackground: tuiLightBackground(os.Getenv("COLORFGBG")),
 		colorless:       profile <= colorprofile.ASCII,
 		noColor:         noColor,
 	}
@@ -122,23 +115,6 @@ func handleCleanupCmd(ctx context.Context, args []string) error {
 	}
 
 	return nil
-}
-
-// cleanupColorProfile preserves the color-environment precedence used by Lip Gloss v1.
-func cleanupColorProfile(
-	detected colorprofile.Profile,
-	noColor, cliColor, cliColorForce string,
-) (colorprofile.Profile, bool) {
-	forced := cliColorForce != "" && cliColorForce != "0"
-	if noColor != "" || (cliColor == "0" && !forced) {
-		return colorprofile.ASCII, true
-	}
-
-	if forced {
-		return max(detected, colorprofile.ANSI), false
-	}
-
-	return detected, false
 }
 
 //nolint:gocritic // Value models keep asynchronous command snapshots independent.
@@ -247,10 +223,10 @@ func (model cleanupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "pgdown":
 			model.offset = min(
 				max(0, len(strings.Split(model.preview, "\n"))-1),
-				model.offset+cleanupScrollStep,
+				model.offset+tuiScrollStep,
 			)
 		case "pgup":
-			model.offset = max(0, model.offset-cleanupScrollStep)
+			model.offset = max(0, model.offset-tuiScrollStep)
 		case "d", "b":
 			if len(model.entries) > 0 && !model.loading {
 				model.both, model.confirm = key == "b", true
@@ -368,16 +344,6 @@ func (model cleanupModel) startDelete(force bool) (tea.Model, tea.Cmd) {
 
 		return cleanupLoaded{entries: entries, err: loadErr, notice: notice, dir: dir}
 	}
-}
-
-func cleanupText(text string) string {
-	return strings.Map(func(char rune) rune {
-		if char != '\n' && char != '\t' && unicode.IsControl(char) {
-			return -1
-		}
-
-		return char
-	}, text)
 }
 
 //nolint:gocritic // Value models keep asynchronous command snapshots independent.

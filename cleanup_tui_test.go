@@ -46,7 +46,7 @@ func TestCleanupV2Keys(t *testing.T) {
 	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyPgDown})
 
 	model = cleanupTestModel(t, updated)
-	if model.offset != cleanupScrollStep {
+	if model.offset != tuiScrollStep {
 		t.Fatalf("page down offset = %d", model.offset)
 	}
 
@@ -196,7 +196,7 @@ func TestCleanupBackgroundEnvironmentFallback(t *testing.T) {
 		"": false, "15;0": false, "0;7": true, "0;15": true, "0;default;15": true,
 		"15": false, "0;invalid": false, "0;-1": false, "0;256": false,
 	} {
-		if got := cleanupLightBackground(env); got != wantLight {
+		if got := tuiLightBackground(env); got != wantLight {
 			t.Errorf("COLORFGBG=%q: light = %v, want %v", env, got, wantLight)
 		}
 	}
@@ -204,7 +204,7 @@ func TestCleanupBackgroundEnvironmentFallback(t *testing.T) {
 
 func TestCleanupPaletteMatchesV1(t *testing.T) {
 	for _, dark := range []bool{false, true} {
-		styles := newCleanupStyles(dark)
+		styles := newTuiStyles(dark)
 
 		colors := []struct {
 			name  string
@@ -303,7 +303,7 @@ func TestCleanupColorEnvironmentMatchesV1(t *testing.T) {
 	for _, testcase := range cases {
 		t.Run(testcase.name, func(t *testing.T) {
 			for _, detected := range []colorprofile.Profile{colorprofile.NoTTY, colorprofile.TrueColor} {
-				profile, disabled := cleanupColorProfile(
+				profile, disabled := tuiColorProfile(
 					detected, testcase.noColor, testcase.cliColor, testcase.cliColorForce,
 				)
 
