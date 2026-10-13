@@ -1,0 +1,14 @@
+git-tools / cleanup
+/repos/example
+
+╭──────────────────╮ ╭─────────────────────────────────────╮
+│ WORKTREES / BRA… │ │ DIFF PREVIEW                        │
+│                  │ │ /worktrees/example/feature          │
+│ > feature/界面-… │ │                                     │
+│   example / wor… │ │ Against origin/main                 │
+│                  │ │ Behind / ahead: 0 / 1               │
+│                  │ │                                     │
+│ 1 / 3 items      │ │ Lines 1-3 / 12  |  PgUp/PgDown      │
+╰──────────────────╯ ╰─────────────────────────────────────╯
+Origin refs are cached. Fetch separately to update the base…
+j/k select  d remove  b remove + branch  r refresh  q quit
