@@ -45,6 +45,8 @@ func renderPull(model *pullModel) string {
 		notice = model.err.Error()
 	case model.scanning:
 		notice = "Scanning repositories..."
+	case model.notice != "":
+		notice = model.notice
 	case model.done && len(model.entries) == 0:
 		notice = "No repositories found."
 	case model.done:
@@ -63,7 +65,7 @@ func renderPull(model *pullModel) string {
 			tuiClip(notice, model.width),
 		) + "\n" +
 		tuiClip(
-			"j/k select  PgUp/Dn details  "+filterHelp+"  q quit",
+			"j/k select  PgUp/Dn scroll  "+filterHelp+"  s shell  q quit",
 			model.width,
 		) + "\n"
 }

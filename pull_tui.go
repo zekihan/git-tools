@@ -85,6 +85,7 @@ func handlePullCmd(ctx context.Context, args []string) error {
 }
 
 type pullModel struct {
+	notice          string
 	err             error
 	session         *pullSession
 	cancel          context.CancelFunc
@@ -141,6 +142,8 @@ func (model *pullModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if model.stopping {
 			return model, tea.Quit
 		}
+	case pullShellFinishedMsg:
+		model.shellFinished(msg)
 	case tea.KeyPressMsg:
 		cmd := model.key(msg.String())
 
@@ -163,6 +166,8 @@ func (model *pullModel) View() tea.View {
 }
 
 func (model *pullModel) key(key string) tea.Cmd {
+	model.notice = ""
+
 	switch key {
 	case "q", "esc", "ctrl+c":
 		if model.done {
@@ -171,6 +176,8 @@ func (model *pullModel) key(key string) tea.Cmd {
 
 		model.stopping = true
 		model.cancel()
+	case "s":
+		return model.openShell()
 	case "h":
 		selected := model.selectedIndex()
 		model.hideSucceeded = !model.hideSucceeded
