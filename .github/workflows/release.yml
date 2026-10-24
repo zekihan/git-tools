@@ -35,7 +35,7 @@ jobs:
       - run: make lint test
       - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a
         with:
-          version: v2.18.3
+          version: v2.19.0
           args: check
   release:
     needs: checks
@@ -54,7 +54,7 @@ jobs:
           cache: false
       - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a
         with:
-          version: v2.18.3
+          version: v2.19.0
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ github.token }}
