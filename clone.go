@@ -196,7 +196,22 @@ func cloneRepo(ctx context.Context, repoURL, name string) (string, error) {
 		return "", fmt.Errorf("error checking %s: %w", repoPath, err)
 	}
 
-	err = os.MkdirAll(repoPath, defaultDirPermissions)
+	return cloneRepoToPath(ctx, repoURL, repoPath)
+}
+
+func cloneRepoToPath(ctx context.Context, repoURL, repoPath string) (string, error) {
+	err := os.MkdirAll(filepath.Dir(repoPath), defaultDirPermissions)
+	if err != nil {
+		return "", fmt.Errorf("error creating parent directory for %s: %w", repoPath, err)
+	}
+
+	// Mkdir atomically acquires the leaf directory. MkdirAll would also succeed
+	// for a competing clone's directory, allowing our failure cleanup to delete it.
+	err = os.Mkdir(repoPath, defaultDirPermissions)
+	if os.IsExist(err) {
+		return repoPath, fmt.Errorf("%w: %s", ErrDirAlreadyExists, repoPath)
+	}
+
 	if err != nil {
 		return "", fmt.Errorf("error creating directory %s: %w", repoPath, err)
 	}
@@ -205,7 +220,7 @@ func cloneRepo(ctx context.Context, repoURL, name string) (string, error) {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		// Remove the directory we just created so a partial/empty checkout does
+		// Remove only the directory we exclusively created so a partial/empty checkout does
 		// not block a later retry with ErrDirAlreadyExists.
 		_ = os.RemoveAll(repoPath) // best-effort cleanup; original error is returned
 
