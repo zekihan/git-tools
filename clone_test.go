@@ -187,7 +187,7 @@ func Test_getRepoPath(t *testing.T) {
 		},
 		// ERROR CASES
 		{
-			err:  fmt.Errorf("%w: %s", ErrUnsupportedGitURL, "ftp://git.com/user/repo"),
+			err:  fmt.Errorf("%w: %s", ErrUnsupportedGitURL, "ftp://git.com"),
 			name: "unsupported URL format",
 			args: args{
 				repoURL: "ftp://git.com/user/repo",

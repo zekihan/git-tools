@@ -52,14 +52,30 @@ func findGitRepos(ctx context.Context, searchDir string) ([]string, error) {
 
 const commandOutputLimit = 16384
 
-type commandBuffer struct{ bytes.Buffer }
+// Keep the buffer private: promoted ReadFrom and WriteString methods would bypass Write.
+type commandBuffer struct {
+	data      bytes.Buffer
+	truncated bool
+}
+
+func (buffer *commandBuffer) Len() int {
+	return buffer.data.Len()
+}
+
+func (buffer *commandBuffer) String() string {
+	return buffer.data.String()
+}
 
 func (buffer *commandBuffer) Write(data []byte) (int, error) {
 	size := len(data)
 
 	remaining := commandOutputLimit - buffer.Len()
+	if size > remaining {
+		buffer.truncated = true
+	}
+
 	if remaining > 0 {
-		_, _ = buffer.Buffer.Write(data[:min(remaining, size)])
+		_, _ = buffer.data.Write(data[:min(remaining, size)])
 	}
 
 	return size, nil

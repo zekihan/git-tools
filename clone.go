@@ -40,6 +40,8 @@ type repoParts struct {
 	userRepo string
 }
 
+var scpGitURLPattern = regexp.MustCompile(`^git@([\w.-]+(?:[:\d]+)?):(?:([^/]+)/)?([^/]+)$`)
+
 // supportedFormats is a list of parsers for different Git URL schemes.
 // Each entry defines a regex to match a URL pattern and an extraction function.
 //
@@ -72,7 +74,7 @@ var supportedFormats = []repoURLFormat{
 		//  - git@host.com:user/repo.git
 		//  - git@host.com:repo.git
 		//  - git@host.com:port:user/repo.git.
-		regex: regexp.MustCompile(`^git@([\w.-]+(?:[:\d]+)?):(?:([^/]+)/)?([^/]+)$`),
+		regex: scpGitURLPattern,
 		extract: func(matches []string) (string, string, string) {
 			// Matches[1]: hostname (e.g., host.com, host.com:port)
 			// matches[2]: user (optional, can be empty)
@@ -126,7 +128,7 @@ func getRepoSubPath(repoURL, name string) (string, error) {
 func parseRepoParts(repoURL, name string) (repoParts, error) {
 	parseURL, err := clonePathURL(repoURL)
 	if err != nil {
-		return repoParts{}, fmt.Errorf("%w: %s", err, redactGitURL(repoURL))
+		return repoParts{}, fmt.Errorf("%w: %s", err, safeGitURL(repoURL))
 	}
 
 	var hostname, user, repo string
@@ -144,7 +146,7 @@ func parseRepoParts(repoURL, name string) (repoParts, error) {
 	}
 
 	if !parsedSuccessfully {
-		return repoParts{}, fmt.Errorf("%w: %s", ErrUnsupportedGitURL, redactGitURL(repoURL))
+		return repoParts{}, fmt.Errorf("%w: %s", ErrUnsupportedGitURL, safeGitURL(repoURL))
 	}
 
 	if name != "" {
@@ -203,16 +205,25 @@ func cloneRepo(ctx context.Context, repoURL, name string) (string, error) {
 
 	cmd := exec.CommandContext(ctx, "git", "clone", repoURL, repoPath)
 
-	output, err := cmd.CombinedOutput()
+	var output commandBuffer
+
+	cmd.Stdout, cmd.Stderr = &output, &output
+
+	err = cmd.Run()
 	if err != nil {
 		// Remove the directory we just created so a partial/empty checkout does
 		// not block a later retry with ErrDirAlreadyExists.
 		_ = os.RemoveAll(repoPath) // best-effort cleanup; original error is returned
 
+		diagnostics := redactCloneOutput(output.String(), repoURL)
+		if output.truncated {
+			diagnostics += "\n[output truncated]"
+		}
+
 		return "", fmt.Errorf(
 			"error cloning repository: %w\nOutput: %s",
 			err,
-			redactCloneOutput(string(output), repoURL),
+			diagnostics,
 		)
 	}
 
