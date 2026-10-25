@@ -230,15 +230,10 @@ func cloneRepoToPath(ctx context.Context, repoURL, repoPath string) (string, err
 		// not block a later retry with ErrDirAlreadyExists.
 		_ = os.RemoveAll(repoPath) // best-effort cleanup; original error is returned
 
-		diagnostics := redactCloneOutput(output.String(), repoURL)
-		if output.truncated {
-			diagnostics += "\n[output truncated]"
-		}
-
 		return "", fmt.Errorf(
 			"error cloning repository: %w\nOutput: %s",
 			err,
-			diagnostics,
+			cloneDiagnostics(&output, repoURL),
 		)
 	}
 

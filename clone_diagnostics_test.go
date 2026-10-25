@@ -127,10 +127,9 @@ exit 1
 		}
 	}
 
-	if !strings.Contains(output, "[redacted]") ||
-		!strings.Contains(output, "stdout diagnostic padding") ||
-		!strings.Contains(output, "stderr diagnostic padding") {
-		t.Fatal("missing retained and redacted diagnostics")
+	if !strings.Contains(output, "[diagnostics omitted to protect incomplete credentials]") ||
+		strings.Contains(output, "diagnostic padding") {
+		t.Fatal("truncated diagnostic text was not omitted")
 	}
 
 	_, statErr := os.Stat(completed)
@@ -154,6 +153,69 @@ func TestCommandBufferTruncationBoundary(t *testing.T) {
 		if err != nil || written != 4 || buffer.Len() != min(size+4, commandOutputLimit) ||
 			buffer.truncated != (size+4 > commandOutputLimit) {
 			t.Fatalf("size %d: subsequent write violated buffer bound", size)
+		}
+	}
+}
+
+func TestCloneDiagnosticsOmitCredentialFragmentsAtBoundary(t *testing.T) {
+	//nolint:gosec // Synthetic credentials exercise redaction without accessing a service.
+	const repoURL = "https://fixture-user:fixture-secret%40example@host/team/repo"
+
+	for _, credential := range []string{
+		repoURL,
+		"fixture-user",
+		"fixture-secret@example",
+		"fixture-secret%40example",
+	} {
+		for retained := 1; retained < len(credential); retained++ {
+			text := strings.Repeat("x", commandOutputLimit-retained) + credential + "\ntail"
+			for _, chunkSize := range []int{1, 7, commandOutputLimit, len(text)} {
+				var output commandBuffer
+
+				for start := 0; start < len(text); start += chunkSize {
+					_, err := output.Write([]byte(text[start:min(start+chunkSize, len(text))]))
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+
+				if !output.truncated || output.Len() != commandOutputLimit {
+					t.Fatal("fixture did not cross the retention boundary")
+				}
+
+				got := cloneDiagnostics(&output, repoURL)
+				if got != "[output truncated]\n[diagnostics omitted to protect incomplete credentials]" {
+					t.Fatalf("retained=%d chunkSize=%d: credential fragment exposed: %q",
+						retained, chunkSize, got)
+				}
+			}
+		}
+	}
+}
+
+func TestCloneDiagnosticsRedactSplitCredentialsWithoutTruncation(t *testing.T) {
+	//nolint:gosec // Synthetic credentials exercise redaction without accessing a service.
+	const repoURL = "https://fixture-user:fixture-secret%40example@host/team/repo"
+
+	text := "failure: " + repoURL + "\nfixture-user fixture-secret@example fixture-secret%40example\n"
+	for split := 0; split <= len(text); split++ {
+		var output commandBuffer
+
+		_, err := output.Write([]byte(text[:split]))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = output.Write([]byte(text[split:]))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		got := cloneDiagnostics(&output, repoURL)
+		if output.truncated || strings.Contains(got, "fixture-") ||
+			!strings.Contains(got, "[redacted]") ||
+			!strings.Contains(got, "failure:") {
+			t.Fatalf("split=%d: complete diagnostic was not safely retained: %q", split, got)
 		}
 	}
 }

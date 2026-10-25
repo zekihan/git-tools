@@ -45,3 +45,13 @@ func redactCloneOutput(output, repoURL string) string {
 
 	return redactGitURL(output)
 }
+
+func cloneDiagnostics(output *commandBuffer, repoURL string) string {
+	if output.truncated {
+		// The retained prefix may end inside a credential, before redaction can
+		// recognize it. Omit it entirely rather than exposing partial secrets.
+		return "[output truncated]\n[diagnostics omitted to protect incomplete credentials]"
+	}
+
+	return redactCloneOutput(output.String(), repoURL)
+}
