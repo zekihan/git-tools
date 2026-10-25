@@ -17,7 +17,7 @@ const (
 )
 
 type cleanupEntry struct {
-	repo, path, branch, head, base, blocked string
+	repo, path, branch, head, base, blocked, scope string
 }
 
 func cleanupGit(ctx context.Context, dir string, args ...string) (string, error) {
@@ -97,9 +97,24 @@ func loadCleanupEntries(ctx context.Context, dir string) ([]cleanupEntry, error)
 
 	var entries []cleanupEntry
 
+	scope, err := cleanupScopeRoot(dir, local)
+	if err != nil {
+		return nil, err
+	}
+
 	seen := make(map[string]bool)
 
 	for _, repo := range repos {
+		scopeErr := cleanupCheckScope(ctx, repo, scope)
+		if scopeErr != nil {
+			entries = append(
+				entries,
+				cleanupEntry{repo: repo, scope: scope, blocked: scopeErr.Error()},
+			)
+
+			continue
+		}
+
 		identity, identityErr := cleanupRepoIdentity(ctx, repo)
 		if identityErr != nil {
 			entries = append(entries, cleanupEntry{repo: repo, blocked: identityErr.Error()})
@@ -138,6 +153,7 @@ func loadCleanupEntries(ctx context.Context, dir string) ([]cleanupEntry, error)
 				continue
 			}
 
+			entry.scope = scope
 			entries = append(entries, entry)
 		}
 	}
@@ -372,6 +388,11 @@ func cleanupPreview(ctx context.Context, entry cleanupEntry) string {
 
 //nolint:gocritic // Keep an immutable entry snapshot for asynchronous operations.
 func cleanupDelete(ctx context.Context, expected cleanupEntry, both, force bool) error {
+	err := cleanupCheckScope(ctx, expected.repo, expected.scope)
+	if err != nil {
+		return err
+	}
+
 	entries, err := cleanupEntriesForRepo(ctx, expected.repo)
 	if err != nil {
 		return err
@@ -385,6 +406,8 @@ func cleanupDelete(ctx context.Context, expected cleanupEntry, both, force bool)
 		if entry.head != expected.head {
 			return fmt.Errorf("%w: HEAD changed; refresh and review again", errCleanupUnsafe)
 		}
+
+		entry.scope = expected.scope
 
 		return cleanupDeleteEntry(ctx, entry, both, force)
 	}
@@ -432,6 +455,11 @@ func cleanupDeleteEntry(ctx context.Context, entry cleanupEntry, both, force boo
 
 //nolint:gocritic,gocyclo // Keep all destructive risk checks together on an immutable snapshot.
 func cleanupRisks(ctx context.Context, entry cleanupEntry, both bool) ([]string, error) {
+	err := cleanupCheckScope(ctx, entry.repo, entry.scope)
+	if err != nil {
+		return nil, err
+	}
+
 	var risks []string
 
 	switch entry.blocked {

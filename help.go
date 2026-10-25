@@ -78,6 +78,8 @@ func printCleanupHelp() {
 	)
 	fmt.Println("An explicit directory overrides the default scope.")
 	fmt.Println("Directory scans show repositories with linked worktrees or extra local branches.")
+	fmt.Println("Scans exclude repositories with Git metadata or worktrees outside the scan root.")
+	fmt.Println("Select such a repository directly to review its cleanup candidates.")
 	fmt.Println(
 		"Preview committed changes from the merge base with cached origin/HEAD, plus local worktree changes.",
 	)
