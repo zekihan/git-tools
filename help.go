@@ -31,6 +31,9 @@ func printPullHelp() {
 	fmt.Println("Shows queued, pulling, pulled, skipped, and errored repositories.")
 	fmt.Println("Changed repositories and non-default branches are skipped.")
 	fmt.Println(
+		"Untracked and ignored files also cause a repository to be skipped to protect local data.",
+	)
+	fmt.Println(
 		"j/k or arrows: select; PgUp/PgDown: scroll Git output; q: quit and cancel pending work.",
 	)
 	fmt.Println("h: toggle hiding successfully pulled repositories; totals include hidden results.")

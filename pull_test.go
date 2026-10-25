@@ -26,7 +26,16 @@ func pullTestCheckout(t *testing.T) (string, string) {
 
 func TestPullUpdatesAndCapturesOutput(t *testing.T) {
 	source, checkout := pullTestCheckout(t)
-	cleanupTestGit(t, source, "commit", "--allow-empty", "-m", "Advance remote")
+
+	const incomingContent = "new upstream file\n"
+
+	err := os.WriteFile(filepath.Join(source, "incoming.txt"), []byte(incomingContent), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cleanupTestGit(t, source, "add", "incoming.txt")
+	cleanupTestGit(t, source, "commit", "-m", "Advance remote")
 
 	result := pullRepo(t.Context(), checkout)
 	if result.status != pullSucceeded || result.branch != "main" || result.remote != "origin" {
@@ -50,6 +59,75 @@ func TestPullUpdatesAndCapturesOutput(t *testing.T) {
 		"HEAD",
 	) {
 		t.Fatal("checkout did not advance")
+	}
+
+	contents, err := os.ReadFile(filepath.Join(checkout, "incoming.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if string(contents) != incomingContent {
+		t.Fatalf("incoming file missing or changed: %q", contents)
+	}
+}
+
+func TestPullPreservesUntrackedAndIgnoredFiles(t *testing.T) {
+	for _, name := range []string{"untracked", "ignored"} {
+		t.Run(name, func(t *testing.T) {
+			source, checkout := pullTestCheckout(t)
+
+			const (
+				path         = "local.txt"
+				localContent = "local data that must survive\n"
+			)
+
+			if name == "ignored" {
+				err := os.WriteFile(
+					filepath.Join(checkout, ".git", "info", "exclude"),
+					[]byte(path+"\n"),
+					0o600,
+				)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			err := os.WriteFile(filepath.Join(checkout, path), []byte(localContent), 0o600)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if name == "ignored" {
+				cleanupTestGit(t, checkout, "check-ignore", path)
+			}
+
+			err = os.WriteFile(filepath.Join(source, path), []byte("upstream data\n"), 0o600)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			cleanupTestGit(t, source, "add", path)
+			cleanupTestGit(t, source, "commit", "-m", "Track colliding path")
+			before := cleanupTestGit(t, checkout, "rev-parse", "HEAD")
+
+			result := pullRepo(t.Context(), checkout)
+			if result.status != pullSkipped || strings.Contains(result.detail, "$ git pull") {
+				t.Fatalf("unsafe pull: %+v", result)
+			}
+
+			contents, err := os.ReadFile(filepath.Join(checkout, path))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if string(contents) != localContent {
+				t.Fatalf("local file changed: %q", contents)
+			}
+
+			if cleanupTestGit(t, checkout, "rev-parse", "HEAD") != before {
+				t.Fatal("skipped repo changed")
+			}
+		})
 	}
 }
 
