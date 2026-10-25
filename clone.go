@@ -109,7 +109,23 @@ func getRepoPath(repoURL, name string) (string, error) {
 		return "", err
 	}
 
-	destination := filepath.Join(homeDir, "repos", repoSubPath)
+	root := filepath.Join(homeDir, "repos")
+	destination := filepath.Join(root, repoSubPath)
+
+	canonicalRoot, err := canonicalPath(root)
+	if err != nil {
+		return "", fmt.Errorf("resolve clone root: %w", err)
+	}
+
+	canonicalDestination, err := canonicalPath(destination)
+	if err != nil {
+		return "", fmt.Errorf("resolve clone destination: %w", err)
+	}
+
+	if canonicalDestination == canonicalRoot ||
+		!pathWithinRoot(canonicalRoot, canonicalDestination) {
+		return "", fmt.Errorf("%w: destination outside clone root", errInvalidRepoName)
+	}
 
 	return destination, nil
 }
@@ -153,7 +169,7 @@ func parseRepoParts(repoURL, name string) (repoParts, error) {
 
 	repo = strings.TrimSuffix(repo, ".git")
 	if !validRepoComponent(repo) || (user != "" && !validRepoComponent(user)) ||
-		hostname == "." || hostname == ".." {
+		!validRepoComponent(hostname) {
 		return repoParts{}, errInvalidRepoName
 	}
 

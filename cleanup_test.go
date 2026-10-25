@@ -409,7 +409,7 @@ func TestCleanupDirectoryScanFiltersRepositories(t *testing.T) {
 		"add",
 		"-b",
 		"feature",
-		filepath.Join(t.TempDir(), "tree"),
+		filepath.Join(root, "tree"),
 	)
 
 	entries, err := loadCleanupEntries(t.Context(), root)
