@@ -32,4 +32,4 @@ release:
     name: git-tools
   draft: true
 snapshot:
-  version_template: 1.0.0
+  version_template: 2.0.0

@@ -11,7 +11,7 @@ const shortRevisionLen = 12
 // version is the build version and can be overridden at build time with
 // -ldflags "-X main.version=<v>". Setting it to "dev" derives the version
 // from the embedded build info instead.
-var version = "1.0.0"
+var version = "2.0.0"
 
 // versionString returns the resolved version, appending the VCS revision (and a
 // "-dirty" marker for uncommitted builds) when the binary carries build info.
