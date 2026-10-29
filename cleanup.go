@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -25,13 +26,20 @@ type cleanupEntry struct {
 func cleanupGit(ctx context.Context, dir string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
-	raw, err := cmd.CombinedOutput()
+	// Successful commands can warn on stderr. Keep diagnostics out of the
+	// machine-readable paths, refs, and worktree records returned to callers.
+	var stderr bytes.Buffer
+
+	cmd.Stderr = &stderr
+	raw, err := cmd.Output()
 
 	// Git terminates line-oriented output with a newline. Any other whitespace
 	// can belong to a path; trimming it can select a different repository.
 	output := strings.TrimSuffix(string(raw), "\n")
 	if err != nil {
-		return "", fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, output)
+		diagnostics := strings.TrimSuffix(string(raw)+stderr.String(), "\n")
+
+		return "", fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, diagnostics)
 	}
 
 	return output, nil
