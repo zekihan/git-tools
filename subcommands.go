@@ -8,7 +8,14 @@ import (
 	"log/slog"
 )
 
-var errRepoURLRequired = errors.New("repository URL is required")
+const maxRepoArgs = 2 // Repository URL and optional custom name.
+
+var (
+	errRepoURLRequired = errors.New("repository URL is required")
+	errTooManyRepoArgs = errors.New(
+		"too many arguments: expected a repository URL and optional name",
+	)
+)
 
 func handleCloneCmd(ctx context.Context, args []string) error {
 	cloneCmd := flag.NewFlagSet("clone", flag.ExitOnError)
@@ -26,6 +33,16 @@ func handleCloneCmd(ctx context.Context, args []string) error {
 		cloneCmd.Usage()
 
 		return fmt.Errorf("%w", errRepoURLRequired)
+	}
+
+	if cloneCmd.NArg() > maxRepoArgs {
+		slog.ErrorContext(
+			ctx,
+			"Too many arguments for clone command",
+			slog.Any("error", errTooManyRepoArgs),
+		)
+
+		return errTooManyRepoArgs
 	}
 
 	repoURL := cloneCmd.Arg(0)
@@ -80,6 +97,12 @@ func handleRepopathCmd(args []string) error {
 		repopathCmd.Usage()
 
 		return fmt.Errorf("%w", errRepoURLRequired)
+	}
+
+	if repopathCmd.NArg() > maxRepoArgs {
+		slog.Error("Too many arguments for repopath command", slog.Any("error", errTooManyRepoArgs))
+
+		return errTooManyRepoArgs
 	}
 
 	repoURL := repopathCmd.Arg(0)
