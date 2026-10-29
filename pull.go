@@ -62,7 +62,8 @@ func pullRepo(ctx context.Context, dir string) pullResult {
 		cmd.Stdout, cmd.Stderr = &output, &output
 		err := cmd.Run()
 
-		text := strings.TrimSpace(output.String())
+		// Git names may contain Unicode whitespace; remove only the record terminator.
+		text := strings.TrimSuffix(output.String(), "\n")
 		if text != "" {
 			_, _ = fmt.Fprintln(&transcript, text)
 		}
@@ -94,10 +95,11 @@ func pullRepository(result *pullResult, run func(...string) (string, error)) str
 		return err.Error()
 	}
 
-	remotes := strings.Fields(output)
-	if len(remotes) == 0 {
+	if output == "" {
 		return ErrNoRemoteFound.Error()
 	}
+
+	remotes := strings.Split(output, "\n")
 
 	result.remote = remotes[0]
 	if slices.Contains(remotes, defaultRemoteName) {
@@ -175,7 +177,8 @@ func pullDefaultBranch(
 		return err.Error()
 	}
 
-	if upstream == "" {
+	// With no upstream, for-each-ref still emits the format's separator space.
+	if upstream == "" || upstream == " " {
 		return ErrNoUpstreamBranch.Error()
 	}
 
