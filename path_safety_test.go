@@ -201,30 +201,61 @@ func TestCleanupRecursiveRetainsInRootLinkedWorktree(t *testing.T) {
 		t.Fatalf("in-root candidate refused: %v", err)
 	}
 
-	// A new external worktree after loading invalidates the earlier scope check.
+	// An unrelated external worktree must not invalidate an in-root candidate.
 	external := filepath.Join(t.TempDir(), "external")
 	cleanupTestGit(t, repo, "worktree", "add", "-b", "outside", external)
 
-	err = cleanupDelete(t.Context(), entries[0], true, true)
-	if !errors.Is(err, errCleanupUnsafe) {
-		t.Fatalf("changed scope accepted for deletion: %v", err)
-	}
-
-	_, err = os.Stat(linked)
+	err = cleanupDelete(t.Context(), entries[0], true, false)
 	if err != nil {
-		t.Fatalf("in-root worktree removed after scope changed: %v", err)
+		t.Fatalf("external worktree blocked in-root deletion: %v", err)
+	}
+}
+
+func TestCleanupRecursiveConfirmsExternalLinkedWorktree(t *testing.T) {
+	root := t.TempDir()
+	repo := filepath.Join(root, "repo")
+
+	err := os.Rename(cleanupTestRepo(t), repo)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	cleanupTestGit(t, repo, "rev-parse", "--verify", "refs/heads/feature")
+	external := filepath.Join(t.TempDir(), "external")
+	cleanupTestGit(t, repo, "worktree", "add", "-b", "outside", external)
 
-	entries, err = loadCleanupEntries(t.Context(), root)
-	if err != nil || len(entries) == 0 {
-		t.Fatalf("expected blocked repositories: %+v, %v", entries, err)
+	external, err = canonicalPath(external)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	for _, entry := range entries {
-		if !strings.Contains(entry.blocked, "outside recursive cleanup root") {
-			t.Fatalf("external worktree did not block recursive repository: %+v", entry)
-		}
+	entries, err := loadCleanupEntries(t.Context(), root)
+	if err != nil || len(entries) != 1 || entries[0].path != external || entries[0].blocked != "" {
+		t.Fatalf("external linked worktree unavailable: %+v, %v", entries, err)
+	}
+
+	risks, err := cleanupRisks(t.Context(), entries[0], true)
+	if err != nil || len(risks) != 1 ||
+		!strings.Contains(risks[0], "outside recursive cleanup root") {
+		t.Fatalf("external worktree needs explicit risk confirmation: %v, %v", risks, err)
+	}
+
+	err = cleanupDelete(t.Context(), entries[0], true, false)
+	if !errors.Is(err, errCleanupUnsafe) {
+		t.Fatalf("external worktree removed without second confirmation: %v", err)
+	}
+
+	_, err = os.Stat(external)
+	if err != nil {
+		t.Fatalf("unconfirmed external worktree removed: %v", err)
+	}
+
+	err = cleanupDelete(t.Context(), entries[0], true, true)
+	if err != nil {
+		t.Fatalf("confirmed external worktree deletion refused: %v", err)
+	}
+
+	_, err = os.Stat(external)
+	if !os.IsNotExist(err) {
+		t.Fatalf("confirmed external worktree remains: %v", err)
 	}
 }

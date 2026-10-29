@@ -18,8 +18,7 @@ func cleanupScopeRoot(dir string, local bool) (string, error) {
 	return root, nil
 }
 
-// cleanupCheckScope keeps recursive cleanup within its original canonical root.
-// Selecting a repository directly is the explicit opt-in for its external worktrees.
+// cleanupCheckScope confines discovered repositories, while allowing their linked worktrees.
 func cleanupCheckScope(ctx context.Context, repo, root string) error {
 	if root == "" {
 		return nil
@@ -35,24 +34,7 @@ func cleanupCheckScope(ctx context.Context, repo, root string) error {
 		return err
 	}
 
-	err = cleanupCheckPath(root, repo)
-	if err != nil {
-		return err
-	}
-
-	output, err := cleanupGit(ctx, repo, cleanupWorktreeKind, "list", "--porcelain", "-z")
-	if err != nil {
-		return err
-	}
-
-	for _, entry := range parseCleanupWorktrees(output, repo, "") {
-		err = cleanupCheckPath(root, entry.path)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return cleanupCheckPath(root, repo)
 }
 
 func cleanupCheckPath(root, path string) error {

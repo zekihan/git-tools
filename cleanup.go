@@ -462,6 +462,17 @@ func cleanupRisks(ctx context.Context, entry cleanupEntry, both bool) ([]string,
 
 	var risks []string
 
+	if entry.scope != "" && entry.path != "" {
+		resolved, resolveErr := canonicalPath(entry.path)
+		if resolveErr != nil {
+			return nil, fmt.Errorf("%w: resolve worktree path: %w", errCleanupUnsafe, resolveErr)
+		}
+
+		if !pathWithinRoot(entry.scope, resolved) {
+			risks = append(risks, "worktree outside recursive cleanup root: "+resolved)
+		}
+	}
+
 	switch entry.blocked {
 	case "main worktree":
 		return nil, fmt.Errorf("%w: %s", errCleanupUnsafe, entry.blocked)
