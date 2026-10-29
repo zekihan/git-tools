@@ -39,7 +39,6 @@ type cleanupModel struct {
 	pending         cleanupEntry
 	preview         string
 	dir             string
-	typed           string
 	notice          string
 	risks           []string
 	entries         []cleanupEntry
@@ -146,7 +145,7 @@ func (model cleanupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if len(msg.risks) > 0 {
-			model.risks, model.forceConfirm, model.typed = msg.risks, true, ""
+			model.risks, model.forceConfirm = msg.risks, true
 
 			return model, nil
 		}
@@ -263,51 +262,21 @@ func (model cleanupModel) previewCmd() tea.Cmd {
 
 //nolint:ireturn,gocritic // Bubble Tea uses immutable value model snapshots.
 func (model cleanupModel) forceKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch key.String() {
-	case "esc":
-		model.forceConfirm = false
-		model.typed = ""
-	case "backspace", "ctrl+h":
-		if model.typed != "" {
-			model.typed = model.typed[:len(model.typed)-1]
-		}
-	case "enter":
-		if model.typed == "delete" {
-			model.forceConfirm = false
-
-			return model.startDelete(true)
-		}
-	default:
-		model.typed = cleanupForceText(model.typed, key.Text)
+	model.forceConfirm = false
+	if key.String() == "y" {
+		return model.startDelete(true)
 	}
 
 	return model, nil
 }
 
 //nolint:gocritic // Value models keep input updates independent.
-func (model cleanupModel) paste(text string) cleanupModel {
-	if model.busy {
-		return model
-	}
-
-	if model.forceConfirm {
-		model.typed = cleanupForceText(model.typed, text)
-	} else {
-		model.confirm = false
+func (model cleanupModel) paste(_ string) cleanupModel {
+	if !model.busy {
+		model.confirm, model.forceConfirm = false, false
 	}
 
 	return model
-}
-
-// cleanupForceText preserves the same filtering for typed and pasted confirmation text.
-func cleanupForceText(typed, text string) string {
-	for _, char := range text {
-		if char >= 'a' && char <= 'z' && len(typed) < 6 {
-			typed += string(char)
-		}
-	}
-
-	return typed
 }
 
 //nolint:ireturn,gocritic // Bubble Tea uses immutable value model snapshots.

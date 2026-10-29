@@ -234,11 +234,8 @@ func renderCleanupConfirmation(model *cleanupModel, styles *tuiStyles) string {
 			)
 		}
 
-		prompt = "Type delete, then Enter\n" + styles.selected.Width(inner).
-			Render(" > "+model.typed) +
-			"\n" + styles.muted.Render(
-			"Esc cancels",
-		)
+		prompt = styles.heading.Render("y") + " confirm permanent removal    " +
+			styles.muted.Render("any other key cancels")
 	}
 
 	lines = append(lines, prompt)

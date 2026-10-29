@@ -2,6 +2,7 @@
                                                                                 
                                                                                 
                                                                                 
+                                                                                
   ╭──────────────────────────────────────────────────────────────────────────╮  
   │                                                                          │  
   │ CONFIRM PERMANENT REMOVAL                                                │  
@@ -12,11 +13,10 @@
   │                                                                          │  
   │ Local changes will be discarded.                                         │  
   │                                                                          │  
-  │ Type delete, then Enter                                                  │  
-  │  > del                                                                   │  
-  │ Esc cancels                                                              │  
+  │ y confirm permanent removal    any other key cancels                     │  
   │                                                                          │  
   ╰──────────────────────────────────────────────────────────────────────────╯  
+                                                                                
                                                                                 
                                                                                 
                                                                                 

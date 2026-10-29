@@ -99,45 +99,13 @@ func TestCleanupV2QuitAndKeyRelease(t *testing.T) {
 }
 
 func TestCleanupV2ConfirmationInput(t *testing.T) {
-	for _, input := range []tea.Msg{
-		tea.PasteMsg{Content: "dEé\x1bele\nte extra"},
-		tea.KeyPressMsg{Text: "dEé\x1bele\nte extra"},
-	} {
+	for _, key := range []string{"y", "n", "enter", "esc", "delete"} {
 		model := cleanupModel{forceConfirm: true, pending: cleanupEntry{branch: "feature"}}
-		updated, cmd := model.Update(input)
+		updated, cmd := model.forceKey(tea.KeyPressMsg{Text: key})
 
 		model = cleanupTestModel(t, updated)
-		if model.typed != "delete" || !model.forceConfirm || cmd != nil {
-			t.Fatalf(
-				"%T: text = %q, confirmation = %v, command = %v",
-				input,
-				model.typed,
-				model.forceConfirm,
-				cmd != nil,
-			)
-		}
-
-		updated, cmd = model.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
-
-		model = cleanupTestModel(t, updated)
-		if model.typed != "delet" || cmd != nil {
-			t.Fatalf("backspace = %q, command = %v", model.typed, cmd != nil)
-		}
-
-		updated, cmd = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-
-		model = cleanupTestModel(t, updated)
-		if model.busy || cmd != nil {
-			t.Fatal("incomplete text started deletion")
-		}
-
-		updated, _ = model.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
-		model = cleanupTestModel(t, updated)
-		updated, cmd = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-
-		model = cleanupTestModel(t, updated)
-		if !model.busy || model.forceConfirm || cmd == nil {
-			t.Fatal("complete text and enter did not start deletion")
+		if model.forceConfirm || model.busy != (key == "y") || (cmd != nil) != (key == "y") {
+			t.Fatalf("unexpected second confirmation result for %q", key)
 		}
 	}
 }
@@ -154,7 +122,7 @@ func TestCleanupV2PasteDoesNotTriggerActions(t *testing.T) {
 			updated, cmd := model.Update(tea.PasteMsg{Content: text})
 
 			model = cleanupTestModel(t, updated)
-			if cmd != nil || model.typed != "" || model.busy != initial.busy {
+			if cmd != nil || model.busy != initial.busy {
 				t.Fatalf("paste %q triggered an action", text)
 			}
 

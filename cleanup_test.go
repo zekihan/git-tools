@@ -251,7 +251,8 @@ func TestCleanupConfirmationFlow(t *testing.T) {
 	updated, cmd = model.Update(cleanupRiskMsg{risks: []string{"local changes will be discarded"}})
 
 	model = cleanupTestModel(t, updated)
-	if cmd != nil || !model.forceConfirm || !strings.Contains(model.View().Content, "Type delete") {
+	if cmd != nil || !model.forceConfirm ||
+		!strings.Contains(model.View().Content, "confirm permanent removal") {
 		t.Fatal("second confirmation missing")
 	}
 
@@ -262,13 +263,13 @@ func TestCleanupConfirmationFlow(t *testing.T) {
 		t.Fatal("empty confirmation started deletion")
 	}
 
-	updated, _ = model.Update(tea.PasteMsg{Content: "delete"})
+	updated, _ = model.Update(cleanupRiskMsg{risks: []string{"local changes will be discarded"}})
 	model = cleanupTestModel(t, updated)
-	updated, cmd = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	updated, cmd = model.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 
 	model = cleanupTestModel(t, updated)
 	if cmd == nil || !model.busy {
-		t.Fatal("typed confirmation did not start removal")
+		t.Fatal("second y confirmation did not start removal")
 	}
 }
 
