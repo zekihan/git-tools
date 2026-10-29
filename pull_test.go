@@ -71,8 +71,71 @@ func TestPullUpdatesAndCapturesOutput(t *testing.T) {
 	}
 }
 
-func TestPullPreservesUntrackedAndIgnoredFiles(t *testing.T) {
-	for _, name := range []string{"untracked", "ignored"} {
+func TestPullAllowsIgnoredFiles(t *testing.T) {
+	source, checkout := pullTestCheckout(t)
+	cleanupTestGit(t, checkout, "config", "status.showIgnoredFiles", "matching")
+
+	ignored := filepath.Join(checkout, "local.txt")
+
+	err := os.WriteFile(
+		filepath.Join(checkout, ".git", "info", "exclude"),
+		[]byte("local.txt\n"),
+		0o600,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = os.WriteFile(ignored, []byte("local data\n"), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cleanupTestGit(t, checkout, "check-ignore", "local.txt")
+
+	err = os.WriteFile(
+		filepath.Join(source, "incoming.txt"),
+		[]byte("upstream data\n"),
+		0o600,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cleanupTestGit(t, source, "add", "incoming.txt")
+	cleanupTestGit(t, source, "commit", "-m", "Advance remote")
+
+	result := pullRepo(t.Context(), checkout)
+	if result.status != pullSucceeded {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+
+	if cleanupTestGit(
+		t,
+		checkout,
+		"rev-parse",
+		"HEAD",
+	) != cleanupTestGit(
+		t,
+		source,
+		"rev-parse",
+		"HEAD",
+	) {
+		t.Fatal("checkout did not advance")
+	}
+
+	contents, err := os.ReadFile(ignored)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if string(contents) != "local data\n" {
+		t.Fatalf("ignored file changed: %q", contents)
+	}
+}
+
+func TestPullPreservesUntrackedFiles(t *testing.T) {
+	for _, name := range []string{"untracked"} {
 		t.Run(name, func(t *testing.T) {
 			source, checkout := pullTestCheckout(t)
 
@@ -81,24 +144,9 @@ func TestPullPreservesUntrackedAndIgnoredFiles(t *testing.T) {
 				localContent = "local data that must survive\n"
 			)
 
-			if name == "ignored" {
-				err := os.WriteFile(
-					filepath.Join(checkout, ".git", "info", "exclude"),
-					[]byte(path+"\n"),
-					0o600,
-				)
-				if err != nil {
-					t.Fatal(err)
-				}
-			}
-
 			err := os.WriteFile(filepath.Join(checkout, path), []byte(localContent), 0o600)
 			if err != nil {
 				t.Fatal(err)
-			}
-
-			if name == "ignored" {
-				cleanupTestGit(t, checkout, "check-ignore", path)
 			}
 
 			err = os.WriteFile(filepath.Join(source, path), []byte("upstream data\n"), 0o600)

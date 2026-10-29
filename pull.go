@@ -147,9 +147,7 @@ func pullRepository(result *pullResult, run func(...string) (string, error)) str
 		)
 	}
 
-	// Pull can overwrite ignored paths, so include them in the safety check.
-	// Fail closed on all local files that are not represented by the index.
-	output, err = run("status", "--porcelain", "--untracked-files=all", "--ignored=matching")
+	output, err = run("status", "--porcelain", "--untracked-files=all", "--ignored=no")
 	if err != nil {
 		return err.Error()
 	}
@@ -157,7 +155,7 @@ func pullRepository(result *pullResult, run func(...string) (string, error)) str
 	if output != "" {
 		result.status = pullSkipped
 
-		return "Skipped: repository has local changes or untracked/ignored files."
+		return "Skipped: repository has local changes or untracked files."
 	}
 
 	return pullDefaultBranch(result, branch, run)
