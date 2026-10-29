@@ -19,4 +19,4 @@ git-tools / cleanup
 │ 0 / 0 items            │ │ Lines 1-1 / 1  |  PgUp/PgDown                     │
 ╰────────────────────────╯ ╰───────────────────────────────────────────────────╯
 Origin refs are cached. Fetch separately to update the baseline.
-j/k select  d remove  b remove + branch  r refresh  q quit
+j/k move  space mark  a all  d remove  b +branch  r refresh  q quit

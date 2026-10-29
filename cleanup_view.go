@@ -13,6 +13,7 @@ const (
 	cleanupLeftWidthRatio = 3
 	cleanupMaxLeftWidth   = 44
 	cleanupDialogWidth    = 76
+	cleanupConfirmChrome  = 8
 )
 
 func renderCleanup(model *cleanupModel) string {
@@ -33,7 +34,13 @@ func renderCleanup(model *cleanupModel) string {
 	) + lipgloss.NewStyle().
 		Bold(true).
 		Render("cleanup")
-	scope := styles.muted.Render(tuiClip(model.dir, model.width))
+
+	scopeText := model.dir
+	if len(model.selected) > 0 {
+		scopeText += fmt.Sprintf(" | %d selected", len(model.selected))
+	}
+
+	scope := styles.muted.Render(tuiClip(scopeText, model.width))
 	height := model.height - tuiChromeHeight
 	leftWidth := min(cleanupMaxLeftWidth, model.width/cleanupLeftWidthRatio)
 	rightWidth := model.width - leftWidth - 1
@@ -56,11 +63,12 @@ func renderCleanup(model *cleanupModel) string {
 
 	help := styles.heading.Render(
 		"j/k",
-	) + " select  " + styles.heading.Render(
+	) + " move  " + styles.heading.Render("space") + " mark  " +
+		styles.heading.Render("a") + " all  " + styles.heading.Render(
 		"d",
 	) + " remove  " + styles.heading.Render(
 		"b",
-	) + " remove + branch  " + styles.heading.Render(
+	) + " +branch  " + styles.heading.Render(
 		"r",
 	) + " refresh  " + styles.heading.Render(
 		"q",
@@ -111,6 +119,10 @@ func renderCleanupList(model *cleanupModel, width, height int, styles *tuiStyles
 			prefix := "  "
 			if index == model.cursor {
 				prefix = "> "
+			}
+
+			if model.selected[entry] {
+				prefix += "[x] "
 			}
 
 			title := tuiClip(prefix+name, inner)
@@ -236,6 +248,15 @@ func renderCleanupConfirmation(model *cleanupModel, styles *tuiStyles) string {
 
 		prompt = styles.heading.Render("y") + " confirm permanent removal    " +
 			styles.muted.Render("any other key cancels")
+	}
+
+	content := strings.Split(strings.Join(lines, "\n"), "\n")
+
+	available := max(1, model.height-cleanupConfirmChrome)
+	if len(content) > available {
+		start := min(model.offset, len(content)-available)
+		lines = append([]string{}, content[start:start+available]...)
+		lines = append(lines, styles.muted.Render("PgUp/PgDown: review selected items and risks"))
 	}
 
 	lines = append(lines, prompt)

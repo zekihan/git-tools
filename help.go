@@ -89,11 +89,15 @@ func printCleanupHelp() {
 	fmt.Println(
 		"No automatic fetch. Configure origin/HEAD with git remote set-head origin -a if missing.",
 	)
-	fmt.Println("\nj/k or arrows: select; PgUp/PgDown: scroll preview; r: refresh; q: quit.")
-	fmt.Println("d: remove a worktree (keep its branch), or delete a branch without a worktree.")
-	fmt.Println("b: remove a worktree and delete its branch. Every action asks for confirmation.")
 	fmt.Println(
-		"Dirty, locked, default, or unmerged items require typing delete at a second confirmation.",
+		"\nj/k or arrows: move; Space: mark; a: toggle all; PgUp/PgDown: scroll; r: refresh; q: quit.",
+	)
+	fmt.Println("d: remove a worktree (keep its branch), or delete a branch without a worktree.")
+	fmt.Println(
+		"b: remove worktrees and their branches. d/b act on marked items, or the current item.",
+	)
+	fmt.Println(
+		"Dirty, locked, default, unmerged, or external worktrees require a second y confirmation.",
 	)
 	fmt.Println(
 		"Git does not support removing the main worktree.",

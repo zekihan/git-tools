@@ -36,6 +36,8 @@ type cleanupRiskMsg struct {
 //nolint:containedctx // Bubble Tea commands need the command lifetime context.
 type cleanupModel struct {
 	ctx             context.Context
+	selected        map[cleanupEntry]bool
+	pendingBatch    []cleanupEntry
 	pending         cleanupEntry
 	preview         string
 	dir             string
@@ -121,7 +123,7 @@ func (model cleanupModel) Init() tea.Cmd {
 	return tea.Batch(model.load(""), tea.RequestBackgroundColor)
 }
 
-//nolint:ireturn,gocyclo,gocritic // Bubble Tea events form one state machine with immutable snapshots.
+//nolint:ireturn,gocyclo,gocognit,gocritic // Bubble Tea events form one state machine with immutable snapshots.
 func (model cleanupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.ColorProfileMsg:
@@ -145,7 +147,7 @@ func (model cleanupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if len(msg.risks) > 0 {
-			model.risks, model.forceConfirm = msg.risks, true
+			model.risks, model.forceConfirm, model.offset = msg.risks, true, 0
 
 			return model, nil
 		}
@@ -163,6 +165,18 @@ func (model cleanupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return model, nil
 		}
 
+		if (model.confirm || model.forceConfirm) &&
+			(msg.Code == tea.KeyPgDown || msg.Code == tea.KeyPgUp) {
+			step := tuiScrollStep
+			if msg.Code == tea.KeyPgUp {
+				step = -step
+			}
+
+			model.offset = max(0, model.offset+step)
+
+			return model, nil
+		}
+
 		if model.forceConfirm {
 			return model.forceKey(msg)
 		}
@@ -171,13 +185,8 @@ func (model cleanupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			model.confirm = false
 			if key == "y" {
 				model.busy = true
-				entry, both := model.pending, model.both
 
-				return model, func() tea.Msg {
-					risks, err := cleanupRisks(model.ctx, entry, both)
-
-					return cleanupRiskMsg{risks: risks, err: err}
-				}
+				return model, model.checkRisks()
 			}
 
 			return model, nil
@@ -210,10 +219,19 @@ func (model cleanupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			)
 		case "pgup":
 			model.offset = max(0, model.offset-tuiScrollStep)
+		case "space", " ":
+			if len(model.entries) > 0 && !model.loading {
+				model = model.toggleSelection(false)
+			}
+		case "a":
+			if !model.loading && len(model.entries) > 0 {
+				model = model.toggleSelection(true)
+			}
 		case "d", "b":
 			if len(model.entries) > 0 && !model.loading {
-				model.pending = model.entries[model.cursor]
-				model.both, model.confirm = key == "b", true
+				model.pendingBatch = model.cleanupSelection()
+				model.pending = model.pendingBatch[0]
+				model.both, model.confirm, model.offset = key == "b", true, 0
 			}
 		}
 	}
@@ -283,21 +301,16 @@ func (model cleanupModel) paste(_ string) cleanupModel {
 func (model cleanupModel) startDelete(force bool) (tea.Model, tea.Cmd) {
 	model.busy = true
 	model.generation++
-	entry, both := model.pending, model.both
+	batch, both := model.pendingEntries(), model.both
 
 	return model, func() tea.Msg {
-		err := cleanupDelete(model.ctx, entry, both, force)
-
-		notice := "Removed selected item."
-		if err != nil {
-			notice = err.Error()
-		}
+		notice := cleanupDeleteBatch(model.ctx, batch, both, force)
 
 		dir := model.dir
 
 		_, statErr := os.Stat(dir)
 		if os.IsNotExist(statErr) {
-			dir = entry.repo
+			dir = batch[0].repo
 		}
 
 		entries, loadErr := loadCleanupEntries(model.ctx, dir)
@@ -314,6 +327,17 @@ func (model cleanupModel) startDelete(force bool) (tea.Model, tea.Cmd) {
 
 //nolint:gocritic // Value models keep asynchronous command snapshots independent.
 func (model cleanupModel) action() string {
+	if len(model.pendingBatch) > 1 {
+		actions := make([]string, 0, len(model.pendingBatch))
+
+		for _, entry := range model.pendingBatch {
+			single := cleanupModel{pending: entry, both: model.both}
+			actions = append(actions, entry.repo+" / "+single.action())
+		}
+
+		return fmt.Sprintf("%d selected items:\n%s", len(actions), strings.Join(actions, "\n"))
+	}
+
 	entry := model.pending
 	if entry.path == "" {
 		return "delete branch " + entry.branch
@@ -346,6 +370,7 @@ func (model cleanupModel) loaded(msg cleanupLoaded) (tea.Model, tea.Cmd) {
 		return model, nil
 	}
 
+	model.selected, model.pendingBatch = nil, nil
 	model.entries = msg.entries
 	model.cursor = max(0, min(model.cursor, len(model.entries)-1))
 	model.offset, model.preview = 0, "Loading preview..."

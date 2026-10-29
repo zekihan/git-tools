@@ -16,6 +16,8 @@ const (
 	cleanupWorktreeKind = "worktree"
 )
 
+const cleanupMainWorktree = "main worktree"
+
 type cleanupEntry struct {
 	repo, path, branch, head, base, blocked, scope string
 }
@@ -149,7 +151,7 @@ func loadCleanupEntries(ctx context.Context, dir string) ([]cleanupEntry, error)
 		}
 
 		for _, entry := range found {
-			if !local && entry.blocked == "main worktree" {
+			if !local && entry.blocked == cleanupMainWorktree {
 				continue
 			}
 
@@ -260,7 +262,7 @@ func parseCleanupWorktrees(output, repo, base string) []cleanupEntry {
 			}
 
 			if len(entries) == 0 {
-				entry.blocked = "main worktree"
+				entry.blocked = cleanupMainWorktree
 			}
 
 			entries = append(entries, entry)
@@ -474,7 +476,7 @@ func cleanupRisks(ctx context.Context, entry cleanupEntry, both bool) ([]string,
 	}
 
 	switch entry.blocked {
-	case "main worktree":
+	case cleanupMainWorktree:
 		return nil, fmt.Errorf("%w: %s", errCleanupUnsafe, entry.blocked)
 	case "":
 	default:
