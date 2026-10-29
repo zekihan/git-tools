@@ -25,8 +25,9 @@ type cleanupLoaded struct {
 	generation int
 }
 type cleanupPreviewMsg struct {
-	entry cleanupEntry
-	text  string
+	entry      cleanupEntry
+	text       string
+	generation int
 }
 type cleanupRiskMsg struct {
 	err   error
@@ -135,7 +136,8 @@ func (model cleanupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case cleanupLoaded:
 		return model.loaded(msg)
 	case cleanupPreviewMsg:
-		if len(model.entries) > 0 && model.entries[model.cursor] == msg.entry {
+		if msg.generation == model.generation && len(model.entries) > 0 &&
+			model.entries[model.cursor] == msg.entry {
 			model.preview = msg.text
 		}
 	case cleanupRiskMsg:
@@ -275,7 +277,13 @@ func (model cleanupModel) previewCmd() tea.Cmd {
 
 	entry := model.entries[model.cursor]
 
-	return func() tea.Msg { return cleanupPreviewMsg{entry: entry, text: cleanupPreview(model.ctx, entry)} }
+	return func() tea.Msg {
+		return cleanupPreviewMsg{
+			entry:      entry,
+			text:       cleanupPreview(model.ctx, entry),
+			generation: model.generation,
+		}
+	}
 }
 
 //nolint:ireturn,gocritic // Bubble Tea uses immutable value model snapshots.

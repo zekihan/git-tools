@@ -2,6 +2,7 @@ package main
 
 import (
 	"image/color"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -392,5 +393,55 @@ func TestCleanupDeletionUsesConfirmedSnapshot(t *testing.T) {
 
 	if got := cleanupTestGit(t, repo, "branch", "--list", "other"); got == "" {
 		t.Fatal("unconfirmed branch was deleted")
+	}
+}
+
+func TestCleanupIgnoresPreviewFromBeforeRefresh(t *testing.T) {
+	for _, loaded := range []bool{false, true} {
+		t.Run(strconv.FormatBool(loaded), func(t *testing.T) {
+			entry := cleanupEntry{branch: "feature", head: "unchanged"}
+			model := cleanupModel{entries: []cleanupEntry{entry}, preview: "original diff"}
+			stale := cleanupPreviewMsg{entry: entry, text: "outdated diff"}
+			updated, _ := model.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
+
+			model = cleanupTestModel(t, updated)
+			if loaded {
+				updated, _ = model.Update(cleanupLoaded{
+					generation: model.generation, entries: []cleanupEntry{entry},
+				})
+
+				model = cleanupTestModel(t, updated)
+			}
+
+			want := model.preview
+			updated, cmd := model.Update(stale)
+
+			model = cleanupTestModel(t, updated)
+			if model.preview != want || cmd != nil {
+				t.Fatalf(
+					"stale preview replaced current display: got %q, want %q",
+					model.preview,
+					want,
+				)
+			}
+
+			if loaded {
+				updated, _ = model.Update(cleanupPreviewMsg{
+					entry: entry, text: "fresh diff", generation: model.generation,
+				})
+
+				model = cleanupTestModel(t, updated)
+				if model.preview != "fresh diff" {
+					t.Fatal("current preview was rejected after refresh")
+				}
+
+				updated, _ = model.Update(stale)
+
+				model = cleanupTestModel(t, updated)
+				if model.preview != "fresh diff" {
+					t.Fatal("stale preview overwrote the refreshed diff")
+				}
+			}
+		})
 	}
 }
