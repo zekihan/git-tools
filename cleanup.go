@@ -27,7 +27,9 @@ func cleanupGit(ctx context.Context, dir string, args ...string) (string, error)
 	cmd.Dir = dir
 	raw, err := cmd.CombinedOutput()
 
-	output := strings.TrimSpace(string(raw))
+	// Git terminates line-oriented output with a newline. Any other whitespace
+	// can belong to a path; trimming it can select a different repository.
+	output := strings.TrimSuffix(string(raw), "\n")
 	if err != nil {
 		return "", fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, output)
 	}
