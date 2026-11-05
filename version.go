@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"runtime"
 	"runtime/debug"
 )
@@ -53,6 +54,6 @@ func versionString() string {
 	return resolved
 }
 
-func printVersion() {
-	fmt.Printf("git-tools %s %s/%s\n", versionString(), runtime.GOOS, runtime.GOARCH)
+func printVersionTo(out io.Writer) {
+	fmt.Fprintf(out, "git-tools %s %s/%s\n", versionString(), runtime.GOOS, runtime.GOARCH)
 }

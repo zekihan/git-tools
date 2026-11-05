@@ -5,7 +5,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
+	"os"
 )
 
 const maxRepoArgs = 2 // Repository URL and optional custom name.
@@ -81,9 +83,11 @@ func handleCloneCmd(ctx context.Context, args []string) error {
 	return nil
 }
 
-func handleRepopathCmd(args []string) error {
+func handleRepopathCmd(args []string) error { return handleRepopathCmdTo(args, os.Stdout) }
+
+func handleRepopathCmdTo(args []string, out io.Writer) error {
 	repopathCmd := flag.NewFlagSet("repopath", flag.ExitOnError)
-	repopathCmd.Usage = printRepopathHelp
+	repopathCmd.Usage = func() { printRepopathHelpTo(out) }
 
 	err := repopathCmd.Parse(args)
 	if err != nil {
@@ -129,7 +133,7 @@ func handleRepopathCmd(args []string) error {
 		return err
 	}
 
-	fmt.Println(calculatedPath) // Print the path to stdout
+	fmt.Fprintln(out, calculatedPath) // Print the path to stdout
 	slog.Debug(
 		"Successfully calculated repository path",
 		slog.String("url", safeGitURL(repoURL)),

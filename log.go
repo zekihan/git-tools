@@ -1,14 +1,14 @@
 package main
 
 import (
+	"io"
 	"log/slog"
-	"os"
 	"time"
 
 	"github.com/lmittmann/tint"
 )
 
-func initLogger(logLevel string) {
+func initLogger(logLevel string, stderr io.Writer) {
 	level := slog.LevelInfo
 
 	switch logLevel {
@@ -29,7 +29,7 @@ func initLogger(logLevel string) {
 	// Initialize the logger. Logs go to stderr so commands that print their
 	// result to stdout (e.g. repopath) stay capturable in shells.
 	logger := slog.New(
-		tint.NewTextHandler(os.Stderr, &tint.Options{Level: level, TimeFormat: time.RFC3339}),
+		tint.NewTextHandler(stderr, &tint.Options{Level: level, TimeFormat: time.RFC3339}),
 	)
 	slog.SetDefault(logger)
 }
