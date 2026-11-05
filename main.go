@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -16,50 +18,62 @@ var (
 	defaultLogLevel    = "info"
 )
 
-var (
-	verbose  = flag.Bool("v", false, "Enable verbose (DEBUG level) logging (global)")
-	logLevel = flag.String(
+const flagErrorExitCode = 2
+
+var threadCount = new(int)
+
+func main() {
+	if isAskpassInvocation() {
+		os.Exit(runAskpass(os.Args[1:], os.Stdout, os.Stderr))
+	}
+
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+}
+
+//nolint:gocyclo // Main command dispatcher, not complex enough to warrant refactoring.
+func run(args []string, stdout, stderr io.Writer) int {
+	flags := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	verbose := flags.Bool("v", false, "Enable verbose (DEBUG level) logging (global)")
+	logLevel := flags.String(
 		"log-level",
 		defaultLogLevel,
 		"Set log level: debug, info, warn, error (global)",
 	)
-	threadCount = flag.Int(
+	flags.IntVar(
+		threadCount,
 		"threads",
 		defaultThreadCount,
 		"Number of threads to use for git operations (global)",
 	)
-	showVersion = flag.Bool("version", false, "Print version information and exit (global)")
-)
+	showVersion := flags.Bool("version", false, "Print version information and exit (global)")
 
-func main() {
-	os.Exit(run())
-}
+	flags.Usage = func() { printGlobalHelpTo(stdout, flags) }
 
-//nolint:gocyclo // Main command dispatcher, not complex enough to warrant refactoring.
-func run() int {
-	if isAskpassInvocation() {
-		return runAskpass(os.Args[1:], os.Stdout, os.Stderr)
+	err := flags.Parse(args)
+	if err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+
+		return flagErrorExitCode
 	}
 
-	flag.Usage = printGlobalHelp // Set global usage
-
-	flag.Parse()
-
 	if *showVersion {
-		printVersion()
+		printVersionTo(stdout)
 
 		return 0
 	}
 
 	if *verbose {
-		initLogger("debug")
+		initLogger("debug", stderr)
 	} else {
-		initLogger(*logLevel)
+		initLogger(*logLevel, stderr)
 	}
 
-	args := flag.Args()
+	args = flags.Args()
 	if len(args) < 1 {
-		printGlobalHelp()
+		printGlobalHelpTo(stdout, flags)
 
 		return 1
 	}
@@ -82,7 +96,7 @@ func run() int {
 			return 1
 		}
 	case "repopath":
-		err := handleRepopathCmd(args[1:])
+		err := handleRepopathCmdTo(args[1:], stdout)
 		if err != nil {
 			return 1
 		}
@@ -94,31 +108,33 @@ func run() int {
 			return 1
 		}
 	case "version":
-		printVersion()
+		printVersionTo(stdout)
 	case "help":
 		// Allow "help <command>" for specific help.
 		if len(args) <= 1 {
-			printGlobalHelp()
+			printGlobalHelpTo(stdout, flags)
 
 			return 0
 		}
 
 		switch args[1] {
 		case "cleanup":
-			printCleanupHelp()
+			printCleanupHelpTo(stdout)
 		case "pull":
-			printPullHelp()
+			printPullHelpTo(stdout)
 		case "clone":
-			printCloneHelp()
+			printCloneHelpTo(stdout)
 		case "repopath":
-			printRepopathHelp()
+			printRepopathHelpTo(stdout)
 		default:
-			fmt.Printf("Unknown command: %s\n\n", args[1])
-			printGlobalHelp()
+			fmt.Fprintf(stdout, "Unknown command: %s\n\n", args[1])
+			printGlobalHelpTo(stdout, flags)
+
+			return 1
 		}
 	default:
-		fmt.Printf("Unknown command: %s\n\n", args[0])
-		printGlobalHelp()
+		fmt.Fprintf(stdout, "Unknown command: %s\n\n", args[0])
+		printGlobalHelpTo(stdout, flags)
 
 		return 1
 	}
