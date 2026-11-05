@@ -42,7 +42,8 @@ type pullResult struct {
 }
 
 // pullRepo captures its own transcript so concurrent Git commands never write over the UI.
-func pullRepo(ctx context.Context, dir string) pullResult {
+// Env carries askpass settings so Git and ssh prompt through the TUI, not the terminal.
+func pullRepo(ctx context.Context, dir string, env ...string) pullResult {
 	started := time.Now()
 
 	var transcript commandBuffer
@@ -54,8 +55,15 @@ func pullRepo(ctx context.Context, dir string) pullResult {
 		cmd := exec.CommandContext(ctx, "git", args...)
 		cmd.Dir = dir
 
-		cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GCM_INTERACTIVE=never")
+		cmd.Env = append(
+			os.Environ(),
+			"GIT_TERMINAL_PROMPT=0",
+			"GCM_INTERACTIVE=never",
+			askpassRepoEnv+"="+dir,
+		)
+		cmd.Env = append(cmd.Env, env...)
 		cmd.WaitDelay = time.Second
+		detachGitProcess(cmd)
 
 		var output commandBuffer
 

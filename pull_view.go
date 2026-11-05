@@ -25,6 +25,12 @@ func renderPull(model *pullModel) string {
 	leftWidth := min(pullMaxLeftWidth, model.width/pullLeftWidthRatio)
 	rightWidth := model.width - leftWidth - 1
 	header := styles.heading.Render("git-tools") + styles.muted.Render(" / ") + "pull"
+
+	right := renderPullDetails
+	if model.activePrompt() != nil {
+		right = renderPullPrompt
+	}
+
 	panes := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		renderPullList(
@@ -34,7 +40,7 @@ func renderPull(model *pullModel) string {
 			&styles,
 		),
 		" ",
-		renderPullDetails(model, rightWidth, height, &styles),
+		right(model, rightWidth, height, &styles),
 	)
 
 	notice := model.summary()
@@ -43,6 +49,8 @@ func renderPull(model *pullModel) string {
 		notice = "Canceling Git operations..."
 	case model.err != nil:
 		notice = model.err.Error()
+	case model.promptNotice() != "":
+		notice = model.promptNotice()
 	case model.scanning:
 		notice = "Scanning repositories..."
 	case model.notice != "":
@@ -58,16 +66,18 @@ func renderPull(model *pullModel) string {
 		filterHelp = "h show pulled"
 	}
 
+	help := "j/k move  PgUp/Dn  " + filterHelp + "  s shell  r retry  q quit"
+	if model.activePrompt() != nil {
+		help = "Answer the Git prompt  ctrl+c quit"
+	}
+
 	return header + "\n" + styles.muted.Render(
 		tuiClip(model.dir, model.width),
 	) + "\n\n" + panes + "\n" +
 		styles.muted.Render(
 			tuiClip(notice, model.width),
 		) + "\n" +
-		tuiClip(
-			"j/k move  PgUp/Dn  "+filterHelp+"  s shell  r retry  q quit",
-			model.width,
-		) + "\n"
+		tuiClip(help, model.width) + "\n"
 }
 
 func (model *pullModel) summary() string {

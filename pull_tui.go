@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -51,8 +52,14 @@ func handlePullCmd(ctx context.Context, args []string) error {
 		return errPullTerminal
 	}
 
+	// Without the bridge, detached Git still cannot draw over the TUI; prompts fail instead.
+	askpass, err := startAskpassServer(ctx)
+	if err != nil {
+		slog.DebugContext(ctx, "Askpass unavailable", slog.Any("error", err))
+	}
+
 	runCtx, cancel := context.WithCancel(ctx)
-	session := startPullSession(runCtx, dir, *threadCount)
+	session := startPullSession(runCtx, dir, *threadCount, askpass.env())
 
 	profile, noColor := tuiColorProfile(
 		colorprofile.Detect(os.Stdout, os.Environ()),
@@ -68,13 +75,18 @@ func handlePullCmd(ctx context.Context, args []string) error {
 		noColor:   noColor,
 		dir:       dir,
 		session:   session,
+		askpass:   askpass,
 		cancel:    cancel,
 		scanning:  true,
 		width:     tuiInitialWidth,
 		height:    tuiInitialHeight,
 	}
 
-	defer func() { cancel(); <-model.session.done }()
+	defer func() {
+		cancel()
+		askpass.shutdown()
+		<-model.session.done
+	}()
 
 	_, err = tea.NewProgram(model, tea.WithColorProfile(profile), tea.WithContext(ctx)).Run()
 	if err != nil && !model.stopping {
@@ -88,6 +100,9 @@ type pullModel struct {
 	notice          string
 	err             error
 	session         *pullSession
+	askpass         *askpassServer
+	prompts         []*askpassPrompt
+	input           []rune
 	cancel          context.CancelFunc
 	dir             string
 	entries         []pullEntry
@@ -105,11 +120,19 @@ type pullModel struct {
 }
 
 func (model *pullModel) Init() tea.Cmd {
+	if model.askpass != nil {
+		return tea.Batch(model.session.next, tea.RequestBackgroundColor, model.askpass.next)
+	}
+
 	return tea.Batch(model.session.next, tea.RequestBackgroundColor)
 }
 
 //nolint:ireturn // Bubble Tea requires tea.Model.
 func (model *pullModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if cmd, handled := model.updatePrompt(msg); handled {
+		return model, cmd
+	}
+
 	switch msg := msg.(type) {
 	case tea.ColorProfileMsg:
 		model.colorless = model.noColor || msg.Profile <= colorprofile.ASCII
@@ -272,6 +295,7 @@ func (model *pullModel) retrySelected() tea.Cmd {
 		return nil
 	}
 
+	model.askpass.forget()
 	model.entries[selected].result = pullResult{status: pullRunning}
 	model.offset = 0
 	model.done = false

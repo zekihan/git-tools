@@ -30,10 +30,16 @@ type pullSession struct {
 	ctx    context.Context
 	events chan tea.Msg
 	done   chan struct{}
+	env    []string
 }
 
-func startPullSession(ctx context.Context, dir string, threads int) *pullSession {
-	session := &pullSession{ctx: ctx, events: make(chan tea.Msg), done: make(chan struct{})}
+func startPullSession(ctx context.Context, dir string, threads int, env []string) *pullSession {
+	session := &pullSession{
+		ctx:    ctx,
+		events: make(chan tea.Msg),
+		done:   make(chan struct{}),
+		env:    env,
+	}
 	go func() {
 		defer close(session.done)
 		defer close(session.events)
@@ -53,7 +59,7 @@ func startPullSession(ctx context.Context, dir string, threads int) *pullSession
 						return
 					}
 
-					result := pullRepo(ctx, paths[index])
+					result := pullRepo(ctx, paths[index], env...)
 					if !session.send(ctx, pullFinishedMsg{index: index, result: result}) {
 						return
 					}
@@ -96,12 +102,17 @@ func (session *pullSession) next() tea.Msg {
 }
 
 func (session *pullSession) retry(path string, index int) *pullSession {
-	retry := &pullSession{ctx: session.ctx, events: make(chan tea.Msg), done: make(chan struct{})}
+	retry := &pullSession{
+		ctx:    session.ctx,
+		events: make(chan tea.Msg),
+		done:   make(chan struct{}),
+		env:    session.env,
+	}
 	go func() {
 		defer close(retry.done)
 		defer close(retry.events)
 
-		result := pullRepo(retry.ctx, path)
+		result := pullRepo(retry.ctx, path, retry.env...)
 		retry.send(retry.ctx, pullFinishedMsg{index: index, result: result})
 	}()
 

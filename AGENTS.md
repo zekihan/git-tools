@@ -40,6 +40,8 @@ This is a single-package Go CLI (`package main`) that provides git workflow util
 
 **Pull architecture:** `pull.go` performs Git operations and returns structured results with bounded output. `pull_session.go` owns discovery and a worker pool limited by `--threads` (defaults to `runtime.NumCPU()`). `pull_tui.go` handles input and status messages; `pull_view.go` renders the repository list and selected details. Repos not on their default branch or with local changes are skipped without failing. Quitting cancels pending work and waits for workers to stop.
 
+**Prompts during pull:** Git runs in its own session without a controlling terminal (`git_process_unix.go`), so ssh, credential helpers, and pinentry cannot draw over the TUI; cancellation kills the whole process group. `askpass.go` sets `GIT_ASKPASS`/`SSH_ASKPASS` (with `SSH_ASKPASS_REQUIRE=force`) to the git-tools binary itself; when re-executed as the helper (`main.go` checks `isAskpassInvocation`), it forwards the prompt over a private Unix socket. The server shows one prompt at a time and reuses an answer for identical prompts from other processes, re-asking when the same process asks again (rejected answer). `pull_prompt.go` captures keyboard input and renders the prompt panel.
+
 **Shared terminal UI:** `tui.go` provides colors, panels, clipping, and text sanitization for pull and cleanup. Clone and repopath remain non-interactive.
 
 **Logging:** Uses `log/slog` with the `tint` handler (colored terminal output). Initialized in `log.go`; structured fields used throughout for context-rich log lines.

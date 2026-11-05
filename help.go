@@ -41,6 +41,12 @@ func printPullHelp() {
 		"s: open your shell in the selected repository after its pull finishes; exit returns here.",
 	)
 	fmt.Println("r: retry only the selected repository once current pulls finish.")
+	fmt.Println(
+		"SSH passphrases, host-key checks, and Git credentials are asked inside the TUI;",
+	)
+	fmt.Println(
+		"one answer serves concurrent pulls for the same prompt, and esc cancels them.",
+	)
 	fmt.Println("Results stay open until you quit. Requires an interactive terminal.")
 }
 

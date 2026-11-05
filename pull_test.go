@@ -250,7 +250,7 @@ func TestPullSessionBoundsWorkersAndCancels(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	session := startPullSession(ctx, root, 1)
+	session := startPullSession(ctx, root, 1, nil)
 
 	defer func() { cancel(); <-session.done }()
 
@@ -273,7 +273,7 @@ func TestPullSessionBoundsWorkersAndCancels(t *testing.T) {
 		t.Fatalf("active=%d completed=%d", active, completed)
 	}
 	// Cancellation must unblock a producer even when the UI stops consuming events.
-	session = startPullSession(ctx, root, 1)
+	session = startPullSession(ctx, root, 1, nil)
 
 	cancel()
 
@@ -438,7 +438,7 @@ func TestPullCancelsRunningGit(t *testing.T) {
 func TestPullSessionEmptyAndInvalidDirectory(t *testing.T) {
 	empty := t.TempDir()
 	for _, dir := range []string{empty, filepath.Join(empty, "missing")} {
-		session := startPullSession(t.Context(), dir, 2)
+		session := startPullSession(t.Context(), dir, 2, nil)
 
 		msg, ok := session.next().(pullScanMsg)
 		if !ok {
