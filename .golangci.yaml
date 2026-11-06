@@ -38,7 +38,10 @@ formatters:
           replacement: 'a[b:]'
     gofumpt:
       module-path: github.com/zekihan/§§§{repo}§§§
-      extra-rules: true
+      extra:
+        group-params: true
+        clothe-returns: true
+        balance-calls: true
     goimports:
       local-prefixes:
         - github.com/zekihan/§§§{repo}§§§
@@ -92,7 +95,7 @@ linters:
     exhaustive:
       check:
         - switch
-        - map
+        - mapliteral
       default-case-required: true
     forbidigo:
       forbid:
