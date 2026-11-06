@@ -29,4 +29,6 @@ jobs:
           version: v2.15.0
           install-only: true
       - run: make lint test
+      - name: Check for vulnerabilities
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
       - run: go build -trimpath -o /tmp/git-tools .
