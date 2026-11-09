@@ -22,3 +22,6 @@ WORKDIR /work
 # Git detaches auto-maintenance after fetches; tini reaps those orphans.
 ENTRYPOINT ["/sbin/tini", "--", "git-tools"]
 CMD ["help"]
+LABEL org.opencontainers.image.source="https://github.com/zekihan/git-tools" \
+      org.opencontainers.image.title="git-tools" \
+      org.opencontainers.image.description="Git workflow utilities"
