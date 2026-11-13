@@ -37,4 +37,4 @@ jobs:
     with:
       version: ${{ needs.decide.outputs.version }}
       binaries: true
-      goreleaser-version: v2.20.1 # renovate: depName=goreleaser/goreleaser
+      goreleaser-version: v2.20.2 # renovate: depName=goreleaser/goreleaser
