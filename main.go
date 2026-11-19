@@ -48,7 +48,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 	)
 	showVersion := flags.Bool("version", false, "Print version information and exit (global)")
 
-	flags.Usage = func() { printGlobalHelpTo(stdout, flags) }
+	flags.Usage = func() {
+		flags.SetOutput(stdout)
+		defer flags.SetOutput(stderr)
+
+		printGlobalHelpTo(stdout, flags)
+	}
 
 	err := flags.Parse(args)
 	if err != nil {
@@ -73,7 +78,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	args = flags.Args()
 	if len(args) < 1 {
-		printGlobalHelpTo(stdout, flags)
+		flags.Usage()
 
 		return 1
 	}
@@ -112,7 +117,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	case "help":
 		// Allow "help <command>" for specific help.
 		if len(args) <= 1 {
-			printGlobalHelpTo(stdout, flags)
+			flags.Usage()
 
 			return 0
 		}
@@ -128,13 +133,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 			printRepopathHelpTo(stdout)
 		default:
 			fmt.Fprintf(stdout, "Unknown command: %s\n\n", args[1])
-			printGlobalHelpTo(stdout, flags)
+			flags.Usage()
 
 			return 1
 		}
 	default:
 		fmt.Fprintf(stdout, "Unknown command: %s\n\n", args[0])
-		printGlobalHelpTo(stdout, flags)
+		flags.Usage()
 
 		return 1
 	}
