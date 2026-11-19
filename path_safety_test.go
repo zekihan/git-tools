@@ -163,7 +163,7 @@ func TestCleanupRecursiveRejectsExternalGitdir(t *testing.T) {
 		t.Fatalf("external gitdir not marked out of scope: %+v, %v", entries, err)
 	}
 
-	err = cleanupDelete(t.Context(), entries[0], true, true)
+	err = cleanupDelete(t.Context(), entries[0], true, []string{entries[0].blocked})
 	if !errors.Is(err, errCleanupUnsafe) {
 		t.Fatalf("force bypassed scope boundary: %v", err)
 	}
@@ -205,7 +205,7 @@ func TestCleanupRecursiveRetainsInRootLinkedWorktree(t *testing.T) {
 	external := filepath.Join(t.TempDir(), "external")
 	cleanupTestGit(t, repo, "worktree", "add", "-b", "outside", external)
 
-	err = cleanupDelete(t.Context(), entries[0], true, false)
+	err = cleanupDelete(t.Context(), entries[0], true, nil)
 	if err != nil {
 		t.Fatalf("external worktree blocked in-root deletion: %v", err)
 	}
@@ -239,7 +239,7 @@ func TestCleanupRecursiveConfirmsExternalLinkedWorktree(t *testing.T) {
 		t.Fatalf("external worktree needs explicit risk confirmation: %v, %v", risks, err)
 	}
 
-	err = cleanupDelete(t.Context(), entries[0], true, false)
+	err = cleanupDelete(t.Context(), entries[0], true, nil)
 	if !errors.Is(err, errCleanupUnsafe) {
 		t.Fatalf("external worktree removed without second confirmation: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestCleanupRecursiveConfirmsExternalLinkedWorktree(t *testing.T) {
 		t.Fatalf("unconfirmed external worktree removed: %v", err)
 	}
 
-	err = cleanupDelete(t.Context(), entries[0], true, true)
+	err = cleanupDelete(t.Context(), entries[0], true, risks)
 	if err != nil {
 		t.Fatalf("confirmed external worktree deletion refused: %v", err)
 	}

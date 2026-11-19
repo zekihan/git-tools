@@ -55,7 +55,7 @@ func pullRepo(ctx context.Context, dir string, env ...string) pullResult {
 		cmd.Dir = dir
 
 		cmd.Env = append(
-			pullGitEnv(cmd.Environ()),
+			gitCheckoutEnv(cmd.Environ()),
 			"GIT_TERMINAL_PROMPT=0",
 			"GCM_INTERACTIVE=never",
 			askpassRepoEnv+"="+dir,
@@ -97,22 +97,6 @@ func pullRepo(ctx context.Context, dir string, env ...string) pullResult {
 	}
 
 	return result
-}
-
-// Git hooks can export paths belonging to the invoking repository.
-// Workers resolve repository paths from their assigned checkout.
-func pullGitEnv(env []string) []string {
-	return slices.DeleteFunc(env, func(entry string) bool {
-		name, _, _ := strings.Cut(entry, "=")
-		switch name {
-		case "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_IMPLICIT_WORK_TREE",
-			"GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-			"GIT_GRAFT_FILE", "GIT_SHALLOW_FILE":
-			return true
-		default:
-			return false
-		}
-	})
 }
 
 func pullRepository(result *pullResult, run func(...string) (string, error)) string {

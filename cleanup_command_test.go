@@ -9,6 +9,38 @@ import (
 	"testing"
 )
 
+func TestCleanupIgnoresInheritedCommonDirectory(t *testing.T) {
+	repo := cleanupTestRepo(t)
+	unrelated := cleanupTestRepo(t)
+	cleanupTestGit(t, unrelated, "commit", "--allow-empty", "-m", "Unrelated fixture")
+	cleanupTestGit(t, unrelated, "update-ref", "refs/remotes/origin/main", "HEAD")
+	cleanupTestGit(t, repo, "branch", "feature")
+	cleanupTestGit(t, unrelated, "branch", "feature")
+
+	if !t.Run("cleanup", func(t *testing.T) {
+		t.Setenv("GIT_COMMON_DIR", filepath.Join(unrelated, ".git"))
+
+		entries, err := loadCleanupEntries(t.Context(), repo)
+		if err != nil || len(entries) != 2 || entries[1].branch != "feature" {
+			t.Fatalf("expected feature candidate, got %+v, %v", entries, err)
+		}
+
+		err = cleanupDelete(t.Context(), entries[1], false, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}) {
+		return
+	}
+
+	selected := cleanupTestGit(t, repo, "branch", "--list", "feature")
+
+	other := cleanupTestGit(t, unrelated, "branch", "--list", "feature")
+	if selected != "" || other == "" {
+		t.Fatalf("feature after cleanup: selected repo %q, unrelated repo %q", selected, other)
+	}
+}
+
 func TestCleanupBrokenRefWarningDoesNotCreateCandidates(t *testing.T) {
 	for _, test := range []struct {
 		name  string
@@ -48,7 +80,7 @@ func TestCleanupBrokenRefWarningDoesNotCreateCandidates(t *testing.T) {
 			}
 
 			if test.extra {
-				err = cleanupDelete(t.Context(), cleanupTestEntry(t, repo, "feature"), false, false)
+				err = cleanupDelete(t.Context(), cleanupTestEntry(t, repo, "feature"), false, nil)
 				if err != nil {
 					t.Fatal(err)
 				}

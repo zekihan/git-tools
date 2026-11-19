@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -26,6 +27,7 @@ type cleanupEntry struct {
 func cleanupGit(ctx context.Context, dir string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
+	cmd.Env = gitCheckoutEnv(cmd.Environ())
 	// Successful commands can warn on stderr. Keep diagnostics out of the
 	// machine-readable paths, refs, and worktree records returned to callers.
 	var stderr bytes.Buffer
@@ -296,6 +298,7 @@ func parseCleanupWorktrees(output, repo, base string) []cleanupEntry {
 func cleanupDiff(ctx context.Context, dir string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
+	cmd.Env = gitCheckoutEnv(cmd.Environ())
 
 	var output commandBuffer
 
@@ -399,7 +402,9 @@ func cleanupPreview(ctx context.Context, entry cleanupEntry) string {
 }
 
 //nolint:gocritic // Keep an immutable entry snapshot for asynchronous operations.
-func cleanupDelete(ctx context.Context, expected cleanupEntry, both, force bool) error {
+func cleanupDelete(
+	ctx context.Context, expected cleanupEntry, both bool, approvedRisks []string,
+) error {
 	err := cleanupCheckScope(ctx, expected.repo, expected.scope)
 	if err != nil {
 		return err
@@ -421,31 +426,35 @@ func cleanupDelete(ctx context.Context, expected cleanupEntry, both, force bool)
 
 		entry.scope = expected.scope
 
-		return cleanupDeleteEntry(ctx, entry, both, force)
+		return cleanupDeleteEntry(ctx, entry, both, approvedRisks)
 	}
 
 	return fmt.Errorf("%w: entry changed; refresh and review again", errCleanupUnsafe)
 }
 
 //nolint:gocritic // Keep an immutable entry snapshot.
-func cleanupDeleteEntry(ctx context.Context, entry cleanupEntry, both, force bool) error {
+func cleanupDeleteEntry(
+	ctx context.Context, entry cleanupEntry, both bool, approvedRisks []string,
+) error {
 	risks, err := cleanupRisks(ctx, entry, both)
 	if err != nil {
 		return err
 	}
 
-	if len(risks) > 0 && !force {
-		return fmt.Errorf(
-			"%w: %s; confirm forced removal",
-			errCleanupUnsafe,
-			strings.Join(risks, "; "),
-		)
+	for _, risk := range risks {
+		if !slices.Contains(approvedRisks, risk) {
+			return fmt.Errorf(
+				"%w: %s (review again to confirm forced removal)",
+				errCleanupUnsafe,
+				risk,
+			)
+		}
 	}
 
 	deleteBranch := entry.branch != "" && (entry.path == "" || both)
 
 	if entry.path != "" {
-		err = cleanupRemoveWorktree(ctx, entry, force)
+		err = cleanupRemoveWorktree(ctx, entry, len(risks) > 0)
 		if err != nil {
 			return err
 		}

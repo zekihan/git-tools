@@ -235,6 +235,7 @@ func cloneRepoToPath(ctx context.Context, repoURL, repoPath string) (string, err
 	}
 
 	cmd := exec.CommandContext(ctx, "git", "clone", repoURL, repoPath)
+	cmd.Env = gitCheckoutEnv(cmd.Environ())
 
 	var output commandBuffer
 
