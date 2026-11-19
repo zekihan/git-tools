@@ -61,11 +61,12 @@ type askpassResponse struct {
 
 // askpassPrompt is shown by the TUI until it is answered or its requester exits.
 type askpassPrompt struct {
-	reply chan askpassResponse
-	done  chan struct{}
-	kind  askpassKind
-	text  string
-	repo  string
+	reply      chan askpassResponse
+	done       chan struct{}
+	kind       askpassKind
+	text       string
+	repo       string
+	scrollBack int // TUI offset from the last page.
 }
 
 func (prompt *askpassPrompt) respond(answer string, ok bool) {

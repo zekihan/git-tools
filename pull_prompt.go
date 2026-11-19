@@ -10,6 +10,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
+const pullPromptReservedRows = 3 // Heading, paging hint, and controls.
+
 func waitAskpassClosed(prompt *askpassPrompt) tea.Cmd {
 	return func() tea.Msg {
 		<-prompt.done
@@ -99,6 +101,8 @@ func (model *pullModel) promptKey(prompt *askpassPrompt, msg tea.KeyPressMsg) te
 		return model.key(key)
 	case msg.Code == tea.KeyEscape, prompt.kind == askpassConfirm && key == "n":
 		model.answerPrompt(prompt, "", false)
+	case msg.Code == tea.KeyPgUp, msg.Code == tea.KeyPgDown:
+		model.pagePrompt(prompt, msg.Code == tea.KeyPgDown)
 	case prompt.kind == askpassConfirm:
 		if key == "y" || msg.Code == tea.KeyEnter {
 			model.answerPrompt(prompt, "yes", true)
@@ -119,6 +123,18 @@ func (model *pullModel) promptKey(prompt *askpassPrompt, msg tea.KeyPressMsg) te
 	return nil
 }
 
+func (model *pullModel) pagePrompt(prompt *askpassPrompt, down bool) {
+	if model.width < tuiMinWidth || model.height < tuiMinHeight {
+		return
+	}
+
+	leftWidth := min(pullMaxLeftWidth, model.width/pullLeftWidthRatio)
+	inner := model.width - leftWidth - 1 - tuiPanelFrame
+	body, _, rows := model.promptContent(prompt, inner, model.height-tuiChromeHeight)
+	lastPage := max(0, len(body)-rows)
+	prompt.scrollBack = lastPage - tuiScrollPage(lastPage-prompt.scrollBack, len(body), rows, down)
+}
+
 func (model *pullModel) promptNotice() string {
 	for _, prompt := range model.prompts {
 		if prompt.kind == askpassNotify {
@@ -129,15 +145,20 @@ func (model *pullModel) promptNotice() string {
 	return ""
 }
 
-func (model *pullModel) promptLines(inner int) []string {
-	prompt := model.activePrompt()
+func (model *pullModel) promptContent(
+	prompt *askpassPrompt,
+	inner, height int,
+) ([]string, []string, int) {
 	text := strings.TrimRight(prompt.text, " \n")
 
 	if prompt.repo != "" {
 		text = "Repository: " + prompt.repo + "\n\n" + text
 	}
 
-	input := string(model.input)
+	text = strings.ReplaceAll(tuiText(text), "\t", "    ")
+	body := strings.Split(ansi.Hardwrap(text, inner, false), "\n")
+
+	var input string
 
 	switch prompt.kind {
 	case askpassConfirm:
@@ -145,32 +166,49 @@ func (model *pullModel) promptLines(inner int) []string {
 	case askpassSecret:
 		input = strings.Repeat("*", len(model.input))
 	case askpassVisible, askpassNotify:
+		input = string(model.input)
 	default:
 	}
 
-	text = strings.ReplaceAll(tuiText(text+"\n\n> "+input), "\t", "    ")
+	inputLines := strings.Split(ansi.Hardwrap("> "+input, inner, true), "\n")
+	// Reserve at least one row for the prompt regardless of how much was typed.
+	maxInputRows := tuiBodyRows(height, pullPromptReservedRows+1)
+	inputLines = inputLines[max(0, len(inputLines)-maxInputRows):]
 
-	return strings.Split(ansi.Hardwrap(text, max(1, inner), false), "\n")
+	return body, inputLines, tuiBodyRows(height, pullPromptReservedRows+len(inputLines))
 }
 
 func renderPullPrompt(model *pullModel, width, height int, styles *tuiStyles) string {
 	inner := width - tuiPanelFrame
-	lines := []string{styles.heading.Render(tuiClip("GIT NEEDS INPUT", inner)), ""}
-	body := model.promptLines(inner)
+	prompt := model.activePrompt()
+	body, input, rows := model.promptContent(prompt, inner, height)
+	lastPage := max(0, len(body)-rows)
+	start := max(0, lastPage-prompt.scrollBack)
 
-	// Keep the input line visible when a long prompt does not fit.
-	body = body[max(0, len(body)-(height-tuiPanelFrame-1)):]
-	for _, line := range body {
+	hint := ""
+	if lastPage > 0 {
+		hint = "PgUp/Dn read prompt"
+	}
+
+	lines := []string{
+		styles.heading.Render(tuiClip("GIT NEEDS INPUT", inner)),
+		styles.muted.Render(tuiClip(hint, inner)),
+	}
+	for _, line := range body[start:min(start+rows, len(body))] {
 		lines = append(lines, tuiClip(line, inner))
 	}
 
-	for len(lines) < height-tuiPanelBorder-1 {
+	help := "enter submit  esc cancel"
+	if prompt.kind == askpassConfirm {
+		help = "y allow  n deny"
+	}
+
+	for len(lines) < height-tuiPanelBorder-len(input)-1 {
 		lines = append(lines, "")
 	}
 
-	help := "enter submit  esc cancel"
-	if model.activePrompt().kind == askpassConfirm {
-		help = "y allow  n deny"
+	for _, line := range input {
+		lines = append(lines, tuiClip(line, inner))
 	}
 
 	lines = append(lines, styles.muted.Render(tuiClip(help, inner)))
