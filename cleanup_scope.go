@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 )
 
 func cleanupScopeRoot(dir string, local bool) (string, error) {
@@ -18,18 +20,32 @@ func cleanupScopeRoot(dir string, local bool) (string, error) {
 	return root, nil
 }
 
-// cleanupCheckScope confines discovered repositories, while allowing their linked worktrees.
+// cleanupCheckScope verifies the selected repository and confines recursive discovery.
 func cleanupCheckScope(ctx context.Context, repo, root string) error {
+	gitDir := ".git"
+
+	_, err := os.Lstat(filepath.Join(repo, gitDir))
+	if os.IsNotExist(err) {
+		// The primary worktree record can point to a bare or separate Git directory.
+		gitDir = "."
+	} else if err != nil {
+		return fmt.Errorf("%w: inspect selected repository: %w", errCleanupUnsafe, err)
+	}
+
+	// An explicit Git directory prevents discovery from falling back to an enclosing checkout.
+	commonDir, err := cleanupGit(
+		ctx, repo, "--git-dir="+gitDir, "rev-parse", "--path-format=absolute", "--git-common-dir",
+	)
+	if err != nil {
+		return fmt.Errorf("%w: selected repository unavailable; refresh and review again: %w",
+			errCleanupUnsafe, err)
+	}
+
 	if root == "" {
 		return nil
 	}
 
-	identity, err := cleanupRepoIdentity(ctx, repo)
-	if err != nil {
-		return err
-	}
-
-	err = cleanupCheckPath(root, identity)
+	err = cleanupCheckPath(root, commonDir)
 	if err != nil {
 		return err
 	}
