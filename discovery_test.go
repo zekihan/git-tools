@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 )
 
@@ -39,6 +40,39 @@ func TestDiscoverNestedRepositoriesConsistently(t *testing.T) {
 		got, err := findGitRepos(t.Context(), start)
 		if err != nil || !reflect.DeepEqual(got, want) {
 			t.Fatalf("scan %s = %v, %v; want %v", start, got, err, want)
+		}
+	}
+}
+
+func TestDiscoverRepositoryWithSymlinkedGitDir(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink fixture requires Windows symlink privileges")
+	}
+
+	root := t.TempDir()
+	repo := filepath.Join(root, "checkout")
+	cleanupTestGit(t, root, "init", "-b", "main", repo)
+	marker := filepath.Join(repo, ".git")
+	metadata := filepath.Join(t.TempDir(), "gitdir")
+
+	err := os.Rename(marker, metadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = os.Symlink(metadata, marker)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if inside := cleanupTestGit(t, repo, "rev-parse", "--is-inside-work-tree"); inside != "true" {
+		t.Fatalf("Git did not recognize the checkout: %q", inside)
+	}
+
+	for _, start := range []string{root, repo} {
+		got, err := findGitRepos(t.Context(), start)
+		if err != nil || !reflect.DeepEqual(got, []string{repo}) {
+			t.Errorf("scan %s = %v, %v; want [%s]", start, got, err, repo)
 		}
 	}
 }
