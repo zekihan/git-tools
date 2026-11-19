@@ -71,6 +71,34 @@ func TestPullUpdatesAndCapturesOutput(t *testing.T) {
 	}
 }
 
+func TestPullKeepsGitTraceOutOfParsedOutput(t *testing.T) {
+	source, checkout := pullTestCheckout(t)
+	cleanupTestGit(t, source, "commit", "--allow-empty", "-m", "Advance traced remote")
+
+	result := pullRepo(t.Context(), checkout, "GIT_TRACE=1")
+	if result.status != pullSucceeded || result.branch != "main" || result.remote != "origin" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+
+	if !strings.Contains(result.detail, "trace: built-in: git status") {
+		t.Fatalf("missing Git trace: %s", result.detail)
+	}
+
+	if cleanupTestGit(
+		t,
+		checkout,
+		"rev-parse",
+		"HEAD",
+	) != cleanupTestGit(
+		t,
+		source,
+		"rev-parse",
+		"HEAD",
+	) {
+		t.Fatal("checkout did not advance")
+	}
+}
+
 func TestPullAllowsIgnoredFiles(t *testing.T) {
 	source, checkout := pullTestCheckout(t)
 	cleanupTestGit(t, checkout, "config", "status.showIgnoredFiles", "matching")

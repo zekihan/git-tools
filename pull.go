@@ -65,22 +65,25 @@ func pullRepo(ctx context.Context, dir string, env ...string) pullResult {
 		cmd.WaitDelay = time.Second
 		detachGitProcess(cmd)
 
-		var output commandBuffer
+		// Only stdout contains the records consumed by the preflight checks.
+		var stdout, stderr commandBuffer
 
-		cmd.Stdout, cmd.Stderr = &output, &output
+		cmd.Stdout, cmd.Stderr = &stdout, &stderr
 		err := cmd.Run()
 
 		// Git names may contain Unicode whitespace; remove only the record terminator.
-		text := strings.TrimSuffix(output.String(), "\n")
-		if text != "" {
-			_, _ = fmt.Fprintln(&transcript, text)
+		output := strings.TrimSuffix(stdout.String(), "\n")
+		for _, text := range []string{strings.TrimSuffix(stderr.String(), "\n"), output} {
+			if text != "" {
+				_, _ = fmt.Fprintln(&transcript, text)
+			}
 		}
 
 		if err != nil {
 			return "", fmt.Errorf("git %s: %w", strings.Join(args, " "), err)
 		}
 
-		return text, nil
+		return output, nil
 	}
 	result.detail = pullRepository(&result, run)
 
