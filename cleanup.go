@@ -26,6 +26,7 @@ type cleanupEntry struct {
 func cleanupGit(ctx context.Context, dir string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
+	cmd.Env = gitCheckoutEnv(cmd.Environ())
 	// Successful commands can warn on stderr. Keep diagnostics out of the
 	// machine-readable paths, refs, and worktree records returned to callers.
 	var stderr bytes.Buffer
@@ -296,6 +297,7 @@ func parseCleanupWorktrees(output, repo, base string) []cleanupEntry {
 func cleanupDiff(ctx context.Context, dir string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
+	cmd.Env = gitCheckoutEnv(cmd.Environ())
 
 	var output commandBuffer
 

@@ -7,6 +7,27 @@ import (
 	"testing"
 )
 
+func TestCloneIgnoresInheritedObjectDirectory(t *testing.T) {
+	source := cleanupTestRepo(t)
+	destination := filepath.Join(t.TempDir(), "checkout")
+
+	if !t.Run("clone", func(t *testing.T) {
+		t.Setenv("GIT_OBJECT_DIRECTORY", t.TempDir())
+
+		_, err := cloneRepoToPath(t.Context(), source, destination)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}) {
+		return
+	}
+
+	want := cleanupTestGit(t, source, "rev-parse", "HEAD")
+	if got := cleanupTestGit(t, destination, "rev-parse", "HEAD^{commit}"); got != want {
+		t.Fatalf("checkout HEAD = %s, want %s", got, want)
+	}
+}
+
 func TestConcurrentClonePreservesWinningCheckout(t *testing.T) {
 	source := cleanupTestRepo(t)
 	destination := filepath.Join(t.TempDir(), "host", "team", "checkout")
