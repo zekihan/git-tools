@@ -123,6 +123,69 @@ func TestCleanupBatchConfirmationAndDeletion(t *testing.T) {
 	}
 }
 
+func TestCleanupForceConfirmationRejectsNewWorktreeRisk(t *testing.T) {
+	for _, branch := range []string{"reviewed", "other"} {
+		t.Run(branch, func(t *testing.T) {
+			repo := cleanupTestRepo(t)
+
+			root := t.TempDir()
+			for _, name := range []string{"reviewed", "other"} {
+				cleanupTestGit(t, repo, "worktree", "add", "-b", name, filepath.Join(root, name))
+			}
+
+			cleanupTestGit(t, repo, "worktree", "lock", filepath.Join(root, "reviewed"))
+
+			entries, err := cleanupEntriesForRepo(t.Context(), repo)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			model := cleanupModel{ctx: t.Context(), dir: repo, entries: entries}
+			model = model.toggleSelection(true)
+			updated, _ := model.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
+
+			yes := tea.KeyPressMsg{Code: 'y', Text: "y"}
+
+			updated, check := cleanupTestModel(t, updated).Update(yes)
+			if check == nil {
+				t.Fatal("missing initial risk check")
+			}
+
+			updated, cmd := cleanupTestModel(t, updated).Update(check())
+
+			model = cleanupTestModel(t, updated)
+			if cmd != nil || !model.forceConfirm || len(model.risks) != 1 ||
+				!strings.Contains(model.risks[0], "locked worktree") {
+				t.Fatalf("expected only the lock to require confirmation, got %v", model.risks)
+			}
+
+			marker := filepath.Join(root, branch, "unreviewed.txt")
+
+			err = os.WriteFile(marker, []byte("keep this work"), 0o600)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			updated, remove := model.Update(yes)
+			if remove == nil {
+				t.Fatal("missing removal command")
+			}
+
+			updated, _ = cleanupTestModel(t, updated).Update(remove())
+			model = cleanupTestModel(t, updated)
+
+			contents, err := os.ReadFile(marker)
+			if err != nil || string(contents) != "keep this work" {
+				t.Fatalf("unreviewed file was lost: %q, %v", contents, err)
+			}
+
+			if !strings.Contains(model.notice, "confirm forced removal") {
+				t.Fatalf("expected a new confirmation to be required: %s", model.notice)
+			}
+		})
+	}
+}
+
 func TestCleanupBatchStopsOnChangedEntry(t *testing.T) {
 	repo := cleanupTestRepo(t)
 	for _, branch := range []string{"first", "changed", "last"} {
@@ -145,7 +208,7 @@ func TestCleanupBatchStopsOnChangedEntry(t *testing.T) {
 		t.Context(),
 		[]cleanupEntry{byBranch["first"], byBranch["changed"], byBranch["last"]},
 		true,
-		true,
+		nil,
 	)
 	if !strings.Contains(notice, "Removed 1 / 3 items; stopped") {
 		t.Fatalf("missing partial result: %s", notice)
@@ -208,7 +271,7 @@ func TestCleanupBatchAcrossRepositoriesKeepsBranches(t *testing.T) {
 		}
 	}
 
-	notice := cleanupDeleteBatch(t.Context(), batch, false, false)
+	notice := cleanupDeleteBatch(t.Context(), batch, false, nil)
 	if notice != "Removed 2 selected items." {
 		t.Fatal(notice)
 	}

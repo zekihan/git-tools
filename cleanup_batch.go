@@ -80,12 +80,14 @@ func (model cleanupModel) checkRisks() tea.Cmd {
 	return func() tea.Msg {
 		var risks []string
 
+		byEntry := make(map[cleanupEntry][]string, len(batch))
 		for _, entry := range batch {
 			found, err := cleanupRisks(model.ctx, entry, both)
 			if err != nil {
 				return cleanupRiskMsg{err: err}
 			}
 
+			byEntry[entry] = found
 			for _, risk := range found {
 				if len(batch) > 1 {
 					risk = entry.repo + " / " + entry.branch + ": " + risk
@@ -95,13 +97,15 @@ func (model cleanupModel) checkRisks() tea.Cmd {
 			}
 		}
 
-		return cleanupRiskMsg{risks: risks}
+		return cleanupRiskMsg{byEntry: byEntry, risks: risks}
 	}
 }
 
-func cleanupDeleteBatch(ctx context.Context, batch []cleanupEntry, both, force bool) string {
+func cleanupDeleteBatch(
+	ctx context.Context, batch []cleanupEntry, both bool, approvedRisks map[cleanupEntry][]string,
+) string {
 	for index, entry := range batch {
-		err := cleanupDelete(ctx, entry, both, force)
+		err := cleanupDelete(ctx, entry, both, approvedRisks[entry])
 		if err != nil {
 			if len(batch) == 1 {
 				return err.Error()

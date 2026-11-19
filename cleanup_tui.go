@@ -30,14 +30,16 @@ type cleanupPreviewMsg struct {
 	generation int
 }
 type cleanupRiskMsg struct {
-	err   error
-	risks []string
+	err     error
+	byEntry map[cleanupEntry][]string
+	risks   []string
 }
 
 //nolint:containedctx // Bubble Tea commands need the command lifetime context.
 type cleanupModel struct {
 	ctx             context.Context
 	selected        map[cleanupEntry]bool
+	reviewedRisks   map[cleanupEntry][]string
 	pendingBatch    []cleanupEntry
 	pending         cleanupEntry
 	preview         string
@@ -149,12 +151,13 @@ func (model cleanupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if len(msg.risks) > 0 {
+			model.reviewedRisks = msg.byEntry
 			model.risks, model.forceConfirm, model.offset = msg.risks, true, 0
 
 			return model, nil
 		}
 
-		return model.startDelete(false)
+		return model.startDelete(nil)
 	case tea.PasteMsg:
 		return model.paste(msg.Content), nil
 	case tea.KeyPressMsg:
@@ -288,9 +291,11 @@ func (model cleanupModel) previewCmd() tea.Cmd {
 
 //nolint:ireturn,gocritic // Bubble Tea uses immutable value model snapshots.
 func (model cleanupModel) forceKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	model.forceConfirm = false
+	reviewedRisks := model.reviewedRisks
+
+	model.forceConfirm, model.reviewedRisks = false, nil
 	if key.String() == "y" {
-		return model.startDelete(true)
+		return model.startDelete(reviewedRisks)
 	}
 
 	return model, nil
@@ -299,20 +304,22 @@ func (model cleanupModel) forceKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 //nolint:gocritic // Value models keep input updates independent.
 func (model cleanupModel) paste(_ string) cleanupModel {
 	if !model.busy {
-		model.confirm, model.forceConfirm = false, false
+		model.confirm, model.forceConfirm, model.reviewedRisks = false, false, nil
 	}
 
 	return model
 }
 
 //nolint:ireturn,gocritic // Bubble Tea uses immutable value model snapshots.
-func (model cleanupModel) startDelete(force bool) (tea.Model, tea.Cmd) {
+func (model cleanupModel) startDelete(
+	approvedRisks map[cleanupEntry][]string,
+) (tea.Model, tea.Cmd) {
 	model.busy = true
 	model.generation++
 	batch, both := model.pendingEntries(), model.both
 
 	return model, func() tea.Msg {
-		notice := cleanupDeleteBatch(model.ctx, batch, both, force)
+		notice := cleanupDeleteBatch(model.ctx, batch, both, approvedRisks)
 
 		dir := model.dir
 
@@ -364,7 +371,7 @@ func (model cleanupModel) loaded(msg cleanupLoaded) (tea.Model, tea.Cmd) {
 		return model, nil
 	}
 
-	model.confirm, model.forceConfirm = false, false
+	model.confirm, model.forceConfirm, model.reviewedRisks = false, false, nil
 	model.loading, model.busy = false, false
 
 	model.notice = msg.notice

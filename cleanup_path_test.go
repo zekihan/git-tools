@@ -68,7 +68,7 @@ func cleanupTestWhitespaceSelection(t *testing.T, repo, sibling string) {
 		t.Fatal("requested repository's branch missing")
 	}
 
-	err = cleanupDelete(t.Context(), wanted, false, false)
+	err = cleanupDelete(t.Context(), wanted, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

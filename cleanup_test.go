@@ -84,14 +84,19 @@ func TestCleanupUnmergedBranchRequiresForce(t *testing.T) {
 		t.Fatalf("unexpected preview: %s", preview)
 	}
 
-	err = cleanupDelete(t.Context(), entry, false, false)
+	err = cleanupDelete(t.Context(), entry, false, nil)
 	if !errors.Is(err, errCleanupUnsafe) {
 		t.Fatalf("want refusal before confirmation, got %v", err)
 	}
 
 	cleanupTestGit(t, repo, "rev-parse", "--verify", "refs/heads/feature")
 
-	err = cleanupDelete(t.Context(), entry, false, true)
+	risks, err := cleanupRisks(t.Context(), entry, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = cleanupDelete(t.Context(), entry, false, risks)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +144,7 @@ func TestCleanupDirtyLockedWorktreeRequiresForce(t *testing.T) {
 		t.Fatalf("risks = %v, %v", risks, err)
 	}
 
-	if err := cleanupDelete(t.Context(), entry, false, false); !errors.Is(err, errCleanupUnsafe) {
+	if err := cleanupDelete(t.Context(), entry, false, nil); !errors.Is(err, errCleanupUnsafe) {
 		t.Fatalf("want second confirmation, got %v", err)
 	}
 
@@ -147,7 +152,7 @@ func TestCleanupDirtyLockedWorktreeRequiresForce(t *testing.T) {
 		t.Fatal("worktree removed before confirmation")
 	}
 
-	if err := cleanupDelete(t.Context(), entry, false, true); err != nil {
+	if err := cleanupDelete(t.Context(), entry, false, risks); err != nil {
 		t.Fatal(err)
 	}
 
@@ -166,7 +171,7 @@ func TestCleanupMergedWorktreeAndBranch(t *testing.T) {
 
 	entry := cleanupTestEntry(t, repo, "feature")
 
-	err := cleanupDelete(t.Context(), entry, true, false)
+	err := cleanupDelete(t.Context(), entry, true, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +199,7 @@ func TestCleanupChangedHeadAndMainAreProtected(t *testing.T) {
 	cleanupTestGit(t, repo, "commit", "--allow-empty", "-m", "Move fixture HEAD")
 	cleanupTestGit(t, repo, "checkout", "main")
 
-	err := cleanupDelete(t.Context(), entry, false, true)
+	err := cleanupDelete(t.Context(), entry, false, nil)
 	if !errors.Is(err, errCleanupUnsafe) {
 		t.Fatalf("changed head was not protected: %v", err)
 	}
@@ -203,7 +208,7 @@ func TestCleanupChangedHeadAndMainAreProtected(t *testing.T) {
 		t.Context(),
 		cleanupTestEntry(t, repo, "main"),
 		true,
-		true,
+		[]string{cleanupMainWorktree},
 	)
 	if !errors.Is(
 		err,
@@ -319,7 +324,7 @@ func TestCleanupForceRemovesUnmergedDirtyWorktreeAndBranch(t *testing.T) {
 		t.Fatalf("risks = %v, %v", risks, err)
 	}
 
-	err = cleanupDelete(t.Context(), entry, true, true)
+	err = cleanupDelete(t.Context(), entry, true, risks)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -345,7 +350,7 @@ func TestCleanupMergedIntoOriginButNotLocalHead(t *testing.T) {
 	cleanupTestGit(t, repo, "checkout", "main")
 	entry := cleanupTestEntry(t, repo, "feature")
 
-	err := cleanupDelete(t.Context(), entry, false, false)
+	err := cleanupDelete(t.Context(), entry, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -456,7 +461,7 @@ func TestCleanupBranchTagCollision(t *testing.T) {
 
 	entry := cleanupTestEntry(t, repo, "feature")
 
-	err = cleanupDelete(t.Context(), entry, false, false)
+	err = cleanupDelete(t.Context(), entry, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

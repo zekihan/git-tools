@@ -25,7 +25,7 @@ func TestCleanupIgnoresInheritedCommonDirectory(t *testing.T) {
 			t.Fatalf("expected feature candidate, got %+v, %v", entries, err)
 		}
 
-		err = cleanupDelete(t.Context(), entries[1], false, false)
+		err = cleanupDelete(t.Context(), entries[1], false, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -80,7 +80,7 @@ func TestCleanupBrokenRefWarningDoesNotCreateCandidates(t *testing.T) {
 			}
 
 			if test.extra {
-				err = cleanupDelete(t.Context(), cleanupTestEntry(t, repo, "feature"), false, false)
+				err = cleanupDelete(t.Context(), cleanupTestEntry(t, repo, "feature"), false, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
