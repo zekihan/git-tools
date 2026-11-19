@@ -1,6 +1,4 @@
 # Change these variables as necessary.
-MAIN_PACKAGE_PATH := $(shell pwd)
-BINARY_NAME := $(shell basename $(MAIN_PACKAGE_PATH))
 TMP_DIR := ./tmp
 GO_EXECUTABLE := go
 
@@ -41,8 +39,9 @@ test/cover: tidy
 
 ## build: compile the CLI
 .PHONY: build
+build: export BINARY_NAME := $(shell basename "$$(pwd)")
 build:
-	${GO_EXECUTABLE} build -trimpath -o ${TMP_DIR}/${BINARY_NAME} .
+	${GO_EXECUTABLE} build -trimpath -o "${TMP_DIR}/$$BINARY_NAME" .
 
 ## release/check: validate and build release artifacts without publishing
 .PHONY: release/check
