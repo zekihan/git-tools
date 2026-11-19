@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"slices"
 	"sync"
 
 	tea "charm.land/bubbletea/v2"
@@ -38,7 +39,8 @@ func startPullSession(ctx context.Context, dir string, threads int, env []string
 		ctx:    ctx,
 		events: make(chan tea.Msg),
 		done:   make(chan struct{}),
-		env:    env,
+		// Git would discover an enclosing checkout if this one disappears after the scan.
+		env: append(slices.Clone(env), "GIT_DIR=.git"),
 	}
 	go func() {
 		defer close(session.done)
@@ -59,7 +61,7 @@ func startPullSession(ctx context.Context, dir string, threads int, env []string
 						return
 					}
 
-					result := pullRepo(ctx, paths[index], env...)
+					result := pullRepo(ctx, paths[index], session.env...)
 					if !session.send(ctx, pullFinishedMsg{index: index, result: result}) {
 						return
 					}
