@@ -71,6 +71,34 @@ func TestPullUpdatesAndCapturesOutput(t *testing.T) {
 	}
 }
 
+func TestPullKeepsGitTraceOutOfParsedOutput(t *testing.T) {
+	source, checkout := pullTestCheckout(t)
+	cleanupTestGit(t, source, "commit", "--allow-empty", "-m", "Advance traced remote")
+
+	result := pullRepo(t.Context(), checkout, "GIT_TRACE=1")
+	if result.status != pullSucceeded || result.branch != "main" || result.remote != "origin" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+
+	if !strings.Contains(result.detail, "trace: built-in: git status") {
+		t.Fatalf("missing Git trace: %s", result.detail)
+	}
+
+	if cleanupTestGit(
+		t,
+		checkout,
+		"rev-parse",
+		"HEAD",
+	) != cleanupTestGit(
+		t,
+		source,
+		"rev-parse",
+		"HEAD",
+	) {
+		t.Fatal("checkout did not advance")
+	}
+}
+
 func TestPullAllowsIgnoredFiles(t *testing.T) {
 	source, checkout := pullTestCheckout(t)
 	cleanupTestGit(t, checkout, "config", "status.showIgnoredFiles", "matching")
@@ -543,5 +571,42 @@ func TestPullHandlesBranchTagCollisions(t *testing.T) {
 				t.Fatalf("checkout did not advance: got %s, want %s", got, want)
 			}
 		})
+	}
+}
+
+func TestPullUsesSelectedCheckoutWithInheritedGitEnvironment(t *testing.T) {
+	source, checkout := pullTestCheckout(t)
+	otherSource, otherCheckout := pullTestCheckout(t)
+	cleanupTestGit(t, source, "commit", "--allow-empty", "-m", "Advance selected remote")
+	cleanupTestGit(t, otherSource, "commit", "--allow-empty", "-m", "Advance unrelated remote")
+	otherHead := cleanupTestGit(t, otherCheckout, "rev-parse", "HEAD")
+
+	t.Run("inherited Git paths", func(t *testing.T) {
+		t.Setenv("GIT_DIR", filepath.Join(otherCheckout, ".git"))
+		t.Setenv("GIT_WORK_TREE", otherCheckout)
+		t.Setenv("GIT_INDEX_FILE", filepath.Join(otherCheckout, ".git", "index"))
+
+		result := pullRepo(t.Context(), checkout)
+		if result.status != pullSucceeded {
+			t.Fatalf("unexpected result: %+v", result)
+		}
+	})
+
+	if got := cleanupTestGit(t, otherCheckout, "rev-parse", "HEAD"); got != otherHead {
+		t.Errorf("unrelated checkout moved from %s to %s", otherHead, got)
+	}
+
+	if cleanupTestGit(
+		t,
+		checkout,
+		"rev-parse",
+		"HEAD",
+	) != cleanupTestGit(
+		t,
+		source,
+		"rev-parse",
+		"HEAD",
+	) {
+		t.Error("selected checkout did not advance")
 	}
 }

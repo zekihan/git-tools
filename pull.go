@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"slices"
 	"strings"
@@ -56,7 +55,7 @@ func pullRepo(ctx context.Context, dir string, env ...string) pullResult {
 		cmd.Dir = dir
 
 		cmd.Env = append(
-			os.Environ(),
+			pullGitEnv(cmd.Environ()),
 			"GIT_TERMINAL_PROMPT=0",
 			"GCM_INTERACTIVE=never",
 			askpassRepoEnv+"="+dir,
@@ -65,22 +64,25 @@ func pullRepo(ctx context.Context, dir string, env ...string) pullResult {
 		cmd.WaitDelay = time.Second
 		detachGitProcess(cmd)
 
-		var output commandBuffer
+		// Only stdout contains the records consumed by the preflight checks.
+		var stdout, stderr commandBuffer
 
-		cmd.Stdout, cmd.Stderr = &output, &output
+		cmd.Stdout, cmd.Stderr = &stdout, &stderr
 		err := cmd.Run()
 
 		// Git names may contain Unicode whitespace; remove only the record terminator.
-		text := strings.TrimSuffix(output.String(), "\n")
-		if text != "" {
-			_, _ = fmt.Fprintln(&transcript, text)
+		output := strings.TrimSuffix(stdout.String(), "\n")
+		for _, text := range []string{strings.TrimSuffix(stderr.String(), "\n"), output} {
+			if text != "" {
+				_, _ = fmt.Fprintln(&transcript, text)
+			}
 		}
 
 		if err != nil {
 			return "", fmt.Errorf("git %s: %w", strings.Join(args, " "), err)
 		}
 
-		return text, nil
+		return output, nil
 	}
 	result.detail = pullRepository(&result, run)
 
@@ -95,6 +97,22 @@ func pullRepo(ctx context.Context, dir string, env ...string) pullResult {
 	}
 
 	return result
+}
+
+// Git hooks can export paths belonging to the invoking repository.
+// Workers resolve repository paths from their assigned checkout.
+func pullGitEnv(env []string) []string {
+	return slices.DeleteFunc(env, func(entry string) bool {
+		name, _, _ := strings.Cut(entry, "=")
+		switch name {
+		case "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_IMPLICIT_WORK_TREE",
+			"GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+			"GIT_GRAFT_FILE", "GIT_SHALLOW_FILE":
+			return true
+		default:
+			return false
+		}
+	})
 }
 
 func pullRepository(result *pullResult, run func(...string) (string, error)) string {
