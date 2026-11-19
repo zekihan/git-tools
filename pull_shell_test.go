@@ -40,6 +40,29 @@ func TestRepositoryShellStartsInSelectedDirectory(t *testing.T) {
 	}
 }
 
+func TestRepositoryShellUsesSelectedGitCheckout(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX shell fixture")
+	}
+
+	t.Setenv("SHELL", "/bin/sh")
+	selected, other := t.TempDir(), t.TempDir()
+	cleanupTestGit(t, selected, "init", "-b", "main")
+	cleanupTestGit(t, other, "init", "-b", "main")
+	want := cleanupTestGit(t, selected, "rev-parse", "--show-toplevel")
+
+	t.Setenv("GIT_DIR", filepath.Join(other, ".git"))
+	t.Setenv("GIT_WORK_TREE", other)
+
+	cmd := repositoryShell(selected)
+	cmd.Args = []string{cmd.Path, "-c", "git rev-parse --show-toplevel"}
+
+	output, err := cmd.CombinedOutput()
+	if err != nil || strings.TrimSuffix(string(output), "\n") != want {
+		t.Fatalf("Git reported %q, want %q (error: %v)", output, want, err)
+	}
+}
+
 func TestPullShellUsesVisibleSelectionAndProtectsActivePulls(t *testing.T) {
 	model := &pullModel{hideSucceeded: true, entries: []pullEntry{
 		{path: "/hidden", result: pullResult{status: pullSucceeded}},
