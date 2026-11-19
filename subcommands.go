@@ -133,7 +133,13 @@ func handleRepopathCmdTo(args []string, out io.Writer) error {
 		return err
 	}
 
-	fmt.Fprintln(out, calculatedPath) // Print the path to stdout
+	_, err = fmt.Fprintln(out, calculatedPath)
+	if err != nil {
+		slog.Error("Failed to write repository path", slog.Any("error", err))
+
+		return fmt.Errorf("write repository path: %w", err)
+	}
+
 	slog.Debug(
 		"Successfully calculated repository path",
 		slog.String("url", safeGitURL(repoURL)),

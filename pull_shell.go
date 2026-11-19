@@ -29,7 +29,7 @@ func repositoryShell(dir string) *exec.Cmd {
 	//nolint:gosec,noctx // Bubble Tea owns the terminal and lifetime of the user-configured shell.
 	cmd := exec.Command(shell, args...)
 	cmd.Dir = dir
-	cmd.Env = cmd.Environ()
+	cmd.Env = gitCheckoutEnv(cmd.Environ())
 
 	return cmd
 }

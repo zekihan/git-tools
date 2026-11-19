@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"io"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -82,5 +83,28 @@ func TestRun(t *testing.T) {
 				t.Errorf("stdout = %q, want %q", stdout.String(), tt.contains)
 			}
 		})
+	}
+}
+
+type unwritableRepopathOutput struct{}
+
+func (unwritableRepopathOutput) Write([]byte) (int, error) {
+	return 0, io.ErrClosedPipe
+}
+
+func TestRunRepopathReportsOutputFailure(t *testing.T) {
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
+
+	var stderr bytes.Buffer
+
+	args := []string{"repopath", "https://example.invalid/team/repo.git"}
+	if code := run(args, unwritableRepopathOutput{}, &stderr); code != 1 {
+		t.Errorf("run() = %d, want 1", code)
+	}
+
+	if !strings.Contains(stderr.String(), io.ErrClosedPipe.Error()) {
+		t.Errorf("stderr = %q, want output write error", stderr.String())
 	}
 }
