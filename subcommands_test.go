@@ -1,12 +1,54 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestRepositoryCommandsPreserveNestedNamespace(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_ALLOW_PROTOCOL", "file")
+
+	source := cleanupTestRepo(t)
+
+	const repoURL = "https://example.invalid/group/subgroup/tools.repo.git"
+
+	t.Setenv("GIT_CONFIG_COUNT", "1")
+	t.Setenv("GIT_CONFIG_KEY_0", "url."+filepath.ToSlash(source)+".insteadOf")
+	t.Setenv("GIT_CONFIG_VALUE_0", repoURL)
+
+	wantPath := filepath.Join(home, "repos", "example.invalid", "group", "subgroup", "tools.repo")
+	args := []string{repoURL}
+
+	t.Run("repopath", func(t *testing.T) {
+		var output bytes.Buffer
+
+		err := handleRepopathCmdTo(args, &output)
+		if err != nil || output.String() != wantPath+"\n" {
+			t.Fatalf("repopath = %q, error = %v, want %q", output.String(), err, wantPath+"\n")
+		}
+	})
+
+	t.Run("clone", func(t *testing.T) {
+		err := handleCloneCmd(t.Context(), args)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		wantHead := cleanupTestGit(t, source, "rev-parse", "HEAD")
+		if got := cleanupTestGit(t, wantPath, "rev-parse", "HEAD"); got != wantHead {
+			t.Fatalf("cloned HEAD = %s, want %s", got, wantHead)
+		}
+	})
+}
 
 func TestRepositoryCommandsRejectExtraArguments(t *testing.T) {
 	for _, command := range []string{"clone", "repopath"} {
