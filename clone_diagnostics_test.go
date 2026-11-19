@@ -74,7 +74,7 @@ func TestRepositoryDiagnosticsRetainOnlyConnectionContext(t *testing.T) {
 		}
 	}
 
-	_, err := getRepoPath("https://fixture-user:fixture-secret@host/team/nested/repo", "")
+	_, err := getRepoPath("https://fixture-user:fixture-secret@host/team//repo", "")
 	if !errors.Is(err, ErrUnsupportedGitURL) || !strings.HasSuffix(err.Error(), ": https://host") {
 		t.Fatalf("expected host-only unsupported URL context, got %v", err)
 	}

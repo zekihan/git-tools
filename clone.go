@@ -27,76 +27,21 @@ var (
 	)
 )
 
-// repoURLFormat defines a structure for parsing different Git URL formats.
-// It holds a compiled regular expression and a function to extract
-// hostname, user, and repository name from the matches.
-type repoURLFormat struct {
-	regex   *regexp.Regexp
-	extract func(matches []string) (hostname, user, repo string)
-}
-
 type repoParts struct {
-	hostname string
-	userRepo string
+	hostname       string
+	repositoryPath string
 }
 
-var scpGitURLPattern = regexp.MustCompile(`^git@([\w.-]+(?:[:\d]+)?):(?:([^/]+)/)?([^/]+)$`)
+// repositoryPathPattern captures the optional namespace and the final repository name.
+const repositoryPathPattern = `(?:([^/]+(?:/[^/]+)*)/)?([^/]+)$`
 
-// supportedFormats is a list of parsers for different Git URL schemes.
-// Each entry defines a regex to match a URL pattern and an extraction function.
-//
-// The repo capture group uses [^/]+ (dots allowed) so repository names such as
-// "socket.io" or "next.js" are matched. A trailing ".git" suffix is stripped in
-// parseRepoParts.
-var supportedFormats = []repoURLFormat{
-	{
-		// Regex for HTTPS URLs with user and repo: https://host.com/user/repo.git
-		regex: regexp.MustCompile(`^https://([^/]+)/([^/]+)/([^/]+)$`),
-		extract: func(matches []string) (string, string, string) {
-			// Matches[1]: hostname (e.g., git.com, git.com:8080)
-			// matches[2]: user
-			// matches[3]: repo.
-			return matches[1], matches[2], matches[3]
-		},
-	},
-	{
-		// Regex for HTTPS URLs with repo only: https://host.com/repo.git
-		regex: regexp.MustCompile(`^https://([^/]+)/([^/]+)$`),
-		extract: func(matches []string) (string, string, string) {
-			// Matches[1]: hostname (e.g., git.com, git.com:8080)
-			// matches[2]: repo.
-			return matches[1], "", matches[2] // user is empty
-		},
-	},
-	{
-		// Regex for git@host:path URLs. Handles optional port in host, and optional user in path.
-		// Examples:
-		//  - git@host.com:user/repo.git
-		//  - git@host.com:repo.git
-		//  - git@host.com:port:user/repo.git.
-		regex: scpGitURLPattern,
-		extract: func(matches []string) (string, string, string) {
-			// Matches[1]: hostname (e.g., host.com, host.com:port)
-			// matches[2]: user (optional, can be empty)
-			// matches[3]: repo.
-			return matches[1], matches[2], matches[3]
-		},
-	},
-	{
-		// Regex for ssh://git@host/path URLs.
-		// Handles optional port in host, and optional user in path.
-		// Examples:
-		//  - ssh://git@host.com/user/repo.git
-		//  - ssh://git@host.com/repo.git
-		//  - ssh://git@host.com:port/user/repo.git
-		regex: regexp.MustCompile(`^ssh://git@([^/]+)/(?:([^/]+)/)?([^/]+)$`),
-		extract: func(matches []string) (string, string, string) {
-			// Matches[1]: hostname (e.g., host.com, host.com:port)
-			// matches[2]: user (optional, can be empty)
-			// matches[3]: repo.
-			return matches[1], matches[2], matches[3]
-		},
-	},
+var scpGitURLPattern = regexp.MustCompile(`^git@([\w.-]+(?:[:\d]+)?):` + repositoryPathPattern)
+
+// Each pattern captures the host, namespace, and repository name in that order.
+var supportedFormats = []*regexp.Regexp{
+	regexp.MustCompile(`^https://([^/]+)/` + repositoryPathPattern),
+	scpGitURLPattern,
+	regexp.MustCompile(`^ssh://git@([^/]+)/` + repositoryPathPattern),
 }
 
 // getRepoPath extracts the path from a Git repository URL and an optional name.
@@ -138,7 +83,7 @@ func getRepoSubPath(repoURL, name string) (string, error) {
 		return "", err
 	}
 
-	return filepath.Join(parts.hostname, parts.userRepo), nil
+	return filepath.Join(parts.hostname, parts.repositoryPath), nil
 }
 
 func parseRepoParts(repoURL, name string) (repoParts, error) {
@@ -147,21 +92,18 @@ func parseRepoParts(repoURL, name string) (repoParts, error) {
 		return repoParts{}, fmt.Errorf("%w: %s", err, safeGitURL(repoURL))
 	}
 
-	var hostname, user, repo string
-
-	parsedSuccessfully := false
+	var hostname, namespace, repo string
 
 	for _, format := range supportedFormats {
-		matches := format.regex.FindStringSubmatch(parseURL)
-		if len(matches) > 0 {
-			hostname, user, repo = format.extract(matches)
-			parsedSuccessfully = true
+		matches := format.FindStringSubmatch(parseURL)
+		if matches != nil {
+			hostname, namespace, repo = matches[1], matches[2], matches[3]
 
 			break
 		}
 	}
 
-	if !parsedSuccessfully {
+	if hostname == "" {
 		return repoParts{}, fmt.Errorf("%w: %s", ErrUnsupportedGitURL, safeGitURL(repoURL))
 	}
 
@@ -170,17 +112,19 @@ func parseRepoParts(repoURL, name string) (repoParts, error) {
 	}
 
 	repo = strings.TrimSuffix(repo, ".git")
-	if !validRepoComponent(repo) || (user != "" && !validRepoComponent(user)) ||
-		!validRepoComponent(hostname) {
+	if !validRepoComponent(repo) || !validRepoComponent(hostname) {
 		return repoParts{}, errInvalidRepoName
 	}
 
-	userRepo := repo
-	if user != "" {
-		userRepo = filepath.Join(user, repo)
+	if namespace != "" {
+		for component := range strings.SplitSeq(namespace, "/") {
+			if !validRepoComponent(component) {
+				return repoParts{}, errInvalidRepoName
+			}
+		}
 	}
 
-	return repoParts{hostname: hostname, userRepo: userRepo}, nil
+	return repoParts{hostname: hostname, repositoryPath: filepath.Join(namespace, repo)}, nil
 }
 
 func validRepoComponent(name string) bool {

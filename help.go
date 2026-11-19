@@ -65,7 +65,8 @@ func printCloneHelpTo(out io.Writer) {
 	fmt.Fprintf(out, "Clones a git repository into a structured directory based on the URL.\n")
 	fmt.Fprintf(
 		out,
-		"The default location is $HOME/repos/<hostname>/<user>/<repo> or $HOME/repos/<hostname>/<repo>.\n",
+		"The default location is $HOME/repos/<hostname>/<namespace>/<repo>.\n"+
+			"The namespace may have multiple segments or be absent.\n",
 	)
 	fmt.Fprintf(
 		out,
@@ -84,7 +85,8 @@ func printRepopathHelpTo(out io.Writer) {
 	)
 	fmt.Fprintf(
 		out,
-		"The default location is $HOME/repos/<hostname>/<user>/<repo> or $HOME/repos/<hostname>/<repo>.\n",
+		"The default location is $HOME/repos/<hostname>/<namespace>/<repo>.\n"+
+			"The namespace may have multiple segments or be absent.\n",
 	)
 	fmt.Fprintf(
 		out,

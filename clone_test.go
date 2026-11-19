@@ -1,10 +1,59 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 )
+
+func TestNestedRepoSubPath(t *testing.T) {
+	for _, test := range []struct {
+		repoURL    string
+		customName string
+		want       string
+	}{
+		{
+			repoURL: "https://example.invalid:8443/group/libs.git/tools.repo.git",
+			want:    filepath.Join("example.invalid:8443", "group", "libs.git", "tools.repo"),
+		},
+		{
+			repoURL:    "ssh://git@example.invalid:2222/group/team/tools.repo.git",
+			customName: "local.repo.git",
+			want:       filepath.Join("example.invalid:2222", "group", "team", "local.repo"),
+		},
+		{
+			repoURL: "git@example.invalid:group/team/libs/tools.repo",
+			want:    filepath.Join("example.invalid", "group", "team", "libs", "tools.repo"),
+		},
+	} {
+		got, err := getRepoSubPath(test.repoURL, test.customName)
+		if err != nil || got != test.want {
+			t.Errorf(
+				"getRepoSubPath(%q, %q) = %q, %v, want %q",
+				test.repoURL,
+				test.customName,
+				got,
+				err,
+				test.want,
+			)
+		}
+	}
+}
+
+func TestRejectInvalidNestedNamespaceComponents(t *testing.T) {
+	for _, repoURL := range []string{
+		"https://example.invalid/group/../team/repo.git",
+		"ssh://git@example.invalid/group/./team/repo.git",
+		`git@example.invalid:group/team\libs/repo.git`,
+	} {
+		got, err := getRepoSubPath(repoURL, "")
+		if !errors.Is(err, errInvalidRepoName) || got != "" {
+			t.Errorf("getRepoSubPath(%q) = %q, %v, want invalid name", repoURL, got, err)
+		}
+	}
+}
 
 func Test_getRepoPath(t *testing.T) {
 	homeDir, err := os.UserHomeDir()
