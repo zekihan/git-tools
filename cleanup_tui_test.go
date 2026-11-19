@@ -18,6 +18,7 @@ func TestCleanupV2Keys(t *testing.T) {
 		ctx:     t.Context(),
 		entries: []cleanupEntry{{branch: "one"}, {branch: "two"}},
 		preview: strings.Repeat("line\n", 20),
+		height:  tuiInitialHeight,
 	}
 	for _, key := range []tea.KeyPressMsg{{Code: tea.KeyDown}, {Code: 'j', Text: "j"}} {
 		updated, cmd := model.Update(key)

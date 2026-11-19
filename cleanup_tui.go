@@ -217,13 +217,10 @@ func (model cleanupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			model.preview = "Loading preview..."
 
 			return model, model.previewCmd()
-		case "pgdown":
-			model.offset = min(
-				max(0, len(strings.Split(model.preview, "\n"))-1),
-				model.offset+tuiScrollStep,
-			)
-		case "pgup":
-			model.offset = max(0, model.offset-tuiScrollStep)
+		case "pgup", tuiPageDownKey:
+			rows := tuiBodyRows(model.height-tuiChromeHeight, cleanupDiffReservedRows)
+			lineCount := strings.Count(model.preview, "\n") + 1
+			model.offset = tuiScrollPage(model.offset, lineCount, rows, key == tuiPageDownKey)
 		case "space", " ":
 			if len(model.entries) > 0 && !model.loading {
 				model = model.toggleSelection(false)

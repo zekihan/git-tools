@@ -214,10 +214,10 @@ func (model *pullModel) key(key string) tea.Cmd {
 	case "down", "j":
 		model.cursor = max(0, min(len(model.visibleIndices())-1, model.cursor+1))
 		model.offset = 0
-	case "pgup":
-		model.offset = max(0, model.offset-tuiScrollStep)
-	case "pgdown":
-		model.offset = min(max(0, len(model.detailLines())-1), model.offset+tuiScrollStep)
+	case "pgup", tuiPageDownKey:
+		rows := tuiBodyRows(model.height-tuiChromeHeight, pullDetailReservedRows)
+		lineCount := len(model.detailLines())
+		model.offset = tuiScrollPage(model.offset, lineCount, rows, key == tuiPageDownKey)
 	}
 
 	return nil

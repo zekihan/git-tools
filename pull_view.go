@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	pullMaxLeftWidth   = 48
-	pullLeftWidthRatio = 2
+	pullMaxLeftWidth       = 48
+	pullLeftWidthRatio     = 2
+	pullDetailReservedRows = 3 // Heading, spacer, and line counter.
 )
 
 func renderPull(model *pullModel) string {
@@ -212,9 +213,10 @@ func renderPullDetails(model *pullModel, width, height int, styles *tuiStyles) s
 	inner := width - tuiPanelFrame
 	lines := []string{styles.heading.Render("DETAILS / GIT OUTPUT"), ""}
 	details := model.detailLines()
-	start := min(model.offset, max(0, len(details)-1))
+	rows := tuiBodyRows(height, pullDetailReservedRows)
+	start := tuiPageStart(model.offset, len(details), rows)
 
-	end := min(len(details), start+height-tuiPanelFrame-1)
+	end := min(len(details), start+rows)
 	for _, line := range details[start:end] {
 		lines = append(lines, tuiClip(line, inner))
 	}
