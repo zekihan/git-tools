@@ -40,17 +40,25 @@ func findGitRepos(ctx context.Context, searchDir string) ([]string, error) {
 	repos := make([]string, 0)
 
 	for _, entry := range entries {
-		if !entry.IsDir() {
-			if entry.Name() == ".git" && entry.Type().IsRegular() {
+		if entry.Name() == ".git" {
+			mode := entry.Type()
+			if mode&os.ModeSymlink != 0 {
+				info, statErr := os.Stat(filepath.Join(searchDir, entry.Name()))
+				if statErr != nil {
+					continue
+				}
+
+				mode = info.Mode()
+			}
+
+			if mode.IsDir() || mode.IsRegular() {
 				repos = append(repos, searchDir)
 			}
 
 			continue
 		}
 
-		if entry.Name() == ".git" {
-			repos = append(repos, searchDir)
-
+		if !entry.IsDir() {
 			continue
 		}
 

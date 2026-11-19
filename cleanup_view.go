@@ -10,10 +10,11 @@ import (
 )
 
 const (
-	cleanupLeftWidthRatio = 3
-	cleanupMaxLeftWidth   = 44
-	cleanupDialogWidth    = 76
-	cleanupConfirmChrome  = 8
+	cleanupLeftWidthRatio   = 3
+	cleanupMaxLeftWidth     = 44
+	cleanupDialogWidth      = 76
+	cleanupConfirmChrome    = 8
+	cleanupDiffReservedRows = 4 // Heading, selected item, spacer, and line counter.
 )
 
 func renderCleanup(model *cleanupModel) string {
@@ -183,10 +184,10 @@ func renderCleanupDiff(model *cleanupModel, width, height int, styles *tuiStyles
 		"",
 	}
 	preview := strings.Split(strings.ReplaceAll(tuiText(model.preview), "\t", "    "), "\n")
-	available := max(1, height-tuiPanelBorder-len(lines)-1)
-	start := min(model.offset, max(0, len(preview)-1))
+	rows := tuiBodyRows(height, cleanupDiffReservedRows)
+	start := tuiPageStart(model.offset, len(preview), rows)
 
-	end := min(len(preview), start+available)
+	end := min(len(preview), start+rows)
 	for _, line := range preview[start:end] {
 		lines = append(lines, cleanupDiffLine(line, inner, styles))
 	}

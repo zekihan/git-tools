@@ -15,6 +15,7 @@ const (
 	tuiInitialWidth  = 80
 	tuiInitialHeight = 24
 	tuiScrollStep    = 5
+	tuiPageDownKey   = "pgdown"
 	tuiMinWidth      = 60
 	tuiMinHeight     = 16
 	tuiChromeHeight  = 7
@@ -97,6 +98,25 @@ func tuiPanel(content string, width, height int, active bool, styles *tuiStyles)
 	return lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(border).
 		Padding(0, 1).
 		Width(width).Height(height).Render(content)
+}
+
+func tuiBodyRows(panelHeight, reservedRows int) int {
+	return max(1, panelHeight-tuiPanelBorder-reservedRows)
+}
+
+func tuiPageStart(offset, lineCount, rows int) int {
+	return max(0, min(offset, lineCount-rows))
+}
+
+func tuiScrollPage(offset, lineCount, rows int, down bool) int {
+	step := min(tuiScrollStep, rows)
+	if !down {
+		step = -step
+	}
+
+	start := tuiPageStart(offset, lineCount, rows)
+
+	return tuiPageStart(start+step, lineCount, rows)
 }
 
 // tuiColorProfile preserves the color-environment precedence used by Lip Gloss v1.
