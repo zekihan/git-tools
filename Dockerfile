@@ -3,7 +3,7 @@ ARG RUNTIME_IMAGE=alpine:3.24.4@sha256:f59abe656b692d901e184be3445e0847866021085
 FROM ${GO_IMAGE} AS build
 ARG TARGETOS
 ARG TARGETARCH
-ARG VERSION=2.0.0
+ARG VERSION=2.1.0
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
