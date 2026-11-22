@@ -36,7 +36,7 @@ func printPullHelpTo(out io.Writer) {
 	fmt.Fprintln(out, "Shows queued, pulling, pulled, skipped, and errored repositories.")
 	fmt.Fprintln(out, "Changed repositories and non-default branches are skipped.")
 	fmt.Fprintln(out,
-		"Untracked and ignored files also cause a repository to be skipped to protect local data.",
+		"Untracked files also cause a repository to be skipped; ignored files do not.",
 	)
 	fmt.Fprintln(out,
 		"j/k or arrows: select; PgUp/PgDown: scroll Git output; q: quit and cancel pending work.",
