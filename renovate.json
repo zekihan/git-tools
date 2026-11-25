@@ -1,17 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
-  ],
-  "customManagers": [
-    {
-      "customType": "regex",
-      "fileMatch": ["^\\.github/workflows/release\\.yml$"],
-      "matchStrings": [
-        "goreleaser-version:\\s*(?<currentValue>v\\d+\\.\\d+\\.\\d+)\\s+# renovate: depName=goreleaser/goreleaser"
-      ],
-      "depNameTemplate": "goreleaser/goreleaser",
-      "datasourceTemplate": "github-releases"
-    }
+    "github>zekihan/renovate-config"
   ]
 }
