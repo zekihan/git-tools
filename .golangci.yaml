@@ -1,3 +1,10 @@
+# Shared middle lint tier (OPS-529).
+# Source: zekihan/portfolio-tracker .golangci.yaml at commit ca39ad4 (the most
+# restrictive passing config surveyed across zekihan Go repos).
+# Copied per-repo (no shared-config convention exists); repo-specific paths
+# adapted for zekihan/git-tools: gci prefix, gofumpt module-path, goimports
+# local-prefixes. The portfolio-specific tagliatelle path exclusion is removed
+# (no matching paths in this single-package repo).
 version: "2"
 
 issues:
@@ -24,7 +31,7 @@ formatters:
       sections:
         - standard # Standard section: captures all standard packages.
         - default # Default section: contains all imports that could not be matched to another section type.
-        - prefix(github.com/org/project) # Custom section: groups all imports with the specified Prefix.
+        - prefix(github.com/zekihan/git-tools) # Custom section: groups all imports with the specified Prefix.
         - blank # Blank section: contains all blank imports. This section is not present unless explicitly enabled.
         - dot # Dot section: contains all dot imports. This section is not present unless explicitly enabled.
         - alias # Alias section: contains all alias imports. This section is not present unless explicitly enabled.
@@ -37,14 +44,12 @@ formatters:
         - pattern: 'a[b:len(a)]'
           replacement: 'a[b:]'
     gofumpt:
-      module-path: github.com/zekihan/§§§{repo}§§§
+      module-path: github.com/zekihan/git-tools
       extra:
         group-params: true
-        clothe-returns: true
-        balance-calls: true
     goimports:
       local-prefixes:
-        - github.com/zekihan/§§§{repo}§§§
+        - github.com/zekihan/git-tools
     golines:
       max-len: 100
       tab-len: 4
@@ -59,7 +64,7 @@ linters:
   disable:
     - cyclop # duplicate of gocyclo
     - exhaustruct
-    - exhaustruct_v5
+    - exhaustruct_v5 # v2 name used by newer golangci-lint releases
     - gochecknoglobals
     - gochecknoinits
     - wsl
@@ -67,6 +72,11 @@ linters:
     - testpackage
     - gomodguard
   settings:
+    tagliatelle:
+      case:
+        use-field-name: true
+        rules:
+          json: snake
     depguard:
       rules:
         main:
@@ -140,6 +150,10 @@ linters:
       go-version-pattern: ^1\.\d+\.\d+$
       replace-allow-list: [ ]
     gosec:
+      excludes:
+        - G117 # Potential exposure of secrets via JSON marshaling
+        - G703
+        - G704
       config:
         G104:
           fmt:
@@ -168,6 +182,7 @@ linters:
         - stdlib
         - generic
         - UniversalClient
+        - Getter
     paralleltest:
       ignore-missing: true
     varnamelen:
@@ -246,6 +261,9 @@ linters:
           alias: gatev1alpha2
     misspell:
       locale: US
+    mnd:
+      ignored-numbers:
+        - '2'
     revive:
       rules:
         - name: struct-tag
