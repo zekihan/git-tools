@@ -34,7 +34,6 @@ func TestGoTestScriptUsesInvokedCheckout(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			//nolint:gosec // Exercise shell invocation with and without an executable script.
 			err = os.WriteFile(filepath.Join(checkout, scriptPath), script, test.mode)
 			if err != nil {
 				t.Fatal(err)
